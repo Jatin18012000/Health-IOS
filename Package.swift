@@ -70,5 +70,6 @@ let package = Package(
         .testTarget(name: "AURAIngestTests",    dependencies: ["AURAIngest"]),
         .testTarget(name: "AURAAnalyticsTests", dependencies: ["AURAAnalytics"]),
         .testTarget(name: "AURACoreTests",      dependencies: ["AURACore"]),
+        .testTarget(name: "AURAIntelligenceTests", dependencies: ["AURAIntelligence"]),
     ]
 )

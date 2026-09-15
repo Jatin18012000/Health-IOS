@@ -66,28 +66,3 @@ public struct HealthBrief: Codable, Sendable {
         self.missingDays = missingDays
     }
 }
-
-/// Rejects model output that strays out of bounds before it is ever spoken.
-///
-/// Two failure modes to catch, and they are not the same thing:
-///
-///   - **Clinical overreach.** Diagnosis, prescription, or "you should stop
-///     taking". She observes and encourages; she does not practise medicine.
-///   - **Fabricated figures.** A number in the output that was not in the
-///     brief. This is the one that actually erodes trust, because it is
-///     plausible and specific and wrong.
-public struct OutputGuard: Sendable {
-    public init() {}
-
-    public enum Verdict: Sendable {
-        case allow
-        case rewrite(reason: String)
-        case block(reason: String)
-    }
-
-    public func check(_ output: String, against brief: HealthBrief) -> Verdict {
-        // M5: clinical-language patterns, then cross-check every numeral in
-        // `output` against the figures in `brief`.
-        .allow
-    }
-}
