@@ -89,7 +89,27 @@ Exercise and sleep goals exist in the type but are **unset by default**: an
 unset goal shows no ring rather than a target nobody chose, and sleep in
 particular responds badly to being treated as a number to hit.
 
-## 4. The low-trust sources
+## 4. Should annotated periods be excluded from baselines?
+
+Currently **no** — an annotation explains a dip, it does not remove it. A week
+you marked as illness still counts toward your 365-day baseline, and she says
+"your steps dropped, and you had that week marked as illness" rather than
+quietly pretending the week did not happen.
+
+The argument for excluding it is real: a bad fortnight drags your baseline down,
+which makes the following normal weeks score better than they deserve. Your
+percentiles are measured against a version of you that was ill.
+
+The argument against is that it is a slope. Once illness is excluded, so is
+travel, then a stressful month, and the baseline becomes a record of your good
+weeks — flattering, and no longer a description of your life. It also breaks the
+invariant that nothing a person *types* can move a computed figure, which is
+what currently makes the numbers trustworthy.
+
+Kept as-is on that basis. Worth revisiting if you find yourself distrusting a
+percentile after a long illness.
+
+## 5. The low-trust sources
 
 Your export carries **20,885 samples from FitCloudPro** and 44 from NoiseFit,
 alongside the iPhone and Watch. They currently rank below Apple devices, so they
@@ -103,7 +123,7 @@ the data. **You know which device was on your wrist when; I don't.**
 
 ---
 
-## 5. Who is she?
+## 6. Who is she?
 
 Not asked yet, and it shapes the writing more than any other choice:
 
@@ -116,7 +136,7 @@ Not asked yet, and it shapes the writing more than any other choice:
 
 ---
 
-## 6. The rig: commission or do it yourself
+## 7. The rig: commission or do it yourself
 
 From `docs/CHARACTER.md`. Commissioning costs a few hundred pounds and takes it
 off your plate; Inochi Creator is free and makes it an art project. **This is
@@ -125,7 +145,7 @@ is worth more than any week of code.
 
 ---
 
-## 7. Smaller constants, all one-liners
+## 8. Smaller constants, all one-liners
 
 | Constant | Current | Note |
 |---|---|---|

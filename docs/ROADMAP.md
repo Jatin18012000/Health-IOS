@@ -133,13 +133,18 @@ of which would have been expensive to find later:
   (`App/README.md`), and a real conversation to find out whether the end-to-end
   latency is what the budget assumes.
 
-### M7 — She remembers · ~1–2 weeks
+### M7 — She remembers · written, not yet compiled
 
-- `memory.sqlite`: summarised conversation history, explicit noted facts
-- Context annotations — sick, travelling, injured — so a dip has a reason
-- Scheduled morning brief
-- **Done when** she refers back to something from last week without being
-  reminded.
+- ~~`memory.sqlite`: summarised conversation history, explicit noted facts~~
+  **written** — its own database, because memory is the one thing here that a
+  re-import cannot rebuild
+- ~~Context annotations~~ **written** — matched by overlap, carried in the brief,
+  and deliberately *not* excluded from baselines (see DECISIONS_PENDING §4)
+- ~~Scheduled morning brief~~ **written** — with an explicit bar for what is
+  worth interrupting a morning for, and a silent path that is the common one
+- ~~A screen for reviewing and deleting everything she remembers~~ **written**
+- **Remaining:** `swift build`, and living with it long enough to find out
+  whether the fact proposals are useful or just noise.
 
 ### M8 — Polish · ongoing
 

@@ -57,6 +57,12 @@ computes a delta, never judges a correlation. If a number appears in what she
 says, it was computed in Swift and passed in. `OutputGuard` cross-checks every
 numeral before anything is spoken.
 
+**Annotations never touch the analytics either.** A week marked as illness is
+carried in the `HealthBrief` so she can *explain* a dip, and it changes no
+computed figure — it is not excluded from baselines. Excluding "bad" weeks is
+tempting and makes the baseline flattering and unrepresentative; the alternative
+is recorded in `docs/DECISIONS_PENDING.md`. Same rule as goals, below.
+
 **Goals never touch the analytics.** `Goals` in `AURACore` is a user preference
 and `AnalyticsConfig` holds statistical tunables; they are separate types on
 purpose. Percentiles and the composite score do not consult goals at all — a
@@ -64,6 +70,12 @@ goal is a number someone picked, a percentile is a fact about the person, and
 letting the first move the second corrupts a figure meant to describe reality.
 Goal progress *is* carried in the `HealthBrief`, so `OutputGuard` permits her to
 state it.
+
+**A proposed fact is not a fact.** `MemoryStore.liveFacts` returns confirmed,
+unexpired facts and nothing else. An unconfirmed inference is a guess, and a
+guess repeated back as fact is how a companion becomes confidently wrong about
+someone's life. Rejections are kept rather than deleted so the same wrong
+inference is not proposed again.
 
 **Personal baselines, never population norms.** "Higher than your own last year"
 is a fact. "Above average for your age" is unlicensed medicine. The baseline is

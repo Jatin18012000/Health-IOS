@@ -5,6 +5,7 @@ import AURAAnalytics
 import AURADesign
 import AURAIntelligence
 import AURAVoice
+import AURAMemory
 
 /// The app shell. Deliberately thin — views and wiring only.
 ///
@@ -67,11 +68,13 @@ struct RootView: View {
     enum Section: String, CaseIterable, Identifiable {
         case overview = "Overview"
         case companion = "Companion"
+        case memory = "Memory"
         var id: String { rawValue }
         var icon: String {
             switch self {
             case .overview:  "square.grid.2x2"
             case .companion: "bubble.left.and.text.bubble.right"
+            case .memory:    "brain"
             }
         }
     }
@@ -91,10 +94,25 @@ struct RootView: View {
                 // imply a continuity that does not exist.
                 ConversationView(model: ConversationViewModel(
                     model: container.languageModel,
-                    briefBuilder: BriefBuilder(store: store),
+                    briefBuilder: BriefBuilder(store: store, memory: container.memory),
                     voice: container.voice,
                     transcriber: container.transcriber,
                     day: container.latestDay ?? CalendarDay(Date())))
+
+            case .memory:
+                if let memory = container.memory {
+                    MemoryView(model: MemoryViewModel(memory: memory))
+                } else {
+                    // Memory failing to open must not take the dashboard with
+                    // it — the health data is intact either way.
+                    VStack(spacing: 8) {
+                        Image(systemName: "brain").font(.system(size: 26))
+                        Text("Memory is unavailable")
+                            .font(.system(size: 13))
+                    }
+                    .foregroundStyle(theme.textSecondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
     }
@@ -189,6 +207,10 @@ final class AppContainer {
     @ObservationIgnored let transcriber: any TranscriptionEngine = VoiceFactory.transcription()
     @ObservationIgnored let languageModel: any LanguageModel = ModelFactory.local()
 
+    /// Its own file, next to the health store. See `MemoryStore` for why the
+    /// two are separate.
+    @ObservationIgnored private(set) var memory: MemoryStore?
+
     /// Mirrors the model's readiness as observable state.
     ///
     /// `languageModel.isReady` is ignored by observation, so reading it in a
@@ -198,10 +220,13 @@ final class AppContainer {
 
     /// One folder, under Application Support. Everything AURA knows lives here
     /// and nowhere else, so backing it up or deleting it is a single decision.
-    static var storeURL: URL {
+    static var storeURL: URL { folder.appending(path: "aura.sqlite") }
+    static var memoryURL: URL { folder.appending(path: "memory.sqlite") }
+
+    static var folder: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory,
                                             in: .userDomainMask).first!
-        return base.appending(path: "AURA/aura.sqlite")
+        return base.appending(path: "AURA")
     }
 
     func open() async {
@@ -209,6 +234,12 @@ final class AppContainer {
         do {
             let store = try SQLiteHealthStore(url: Self.storeURL)
             latestDay = try await store.availableRange()?.end
+
+            // Memory is optional in the strict sense: if it cannot be opened,
+            // the dashboard and the health data are unaffected and the app says
+            // so on that one screen rather than refusing to start.
+            memory = try? MemoryStore(url: Self.memoryURL)
+
             status = .ready(store)
 
             // Load the weights now rather than when she is first asked
