@@ -70,6 +70,69 @@ build:
   opt-in, never the default or the fallback.
 - **Any cloud database, sync service or hosting.** There is no server.
 
+## If you ever publish it
+
+Worth understanding before it becomes tempting, because publishing does not add
+a line item to this project -- **it makes it a different project.**
+
+### The fees are the small part
+
+| | |
+|---|---|
+| Apple Developer Program | $99/year -- required for App Store *or* notarised direct download |
+| App Store commission | 15-30% on paid apps; nothing on a free one |
+
+### What actually costs
+
+**Other people's health data.** The moment a second person uses this, you are
+processing sensitive personal data under GDPR Article 9, the India DPDP Act, or
+both. That means a privacy policy, a lawful basis, deletion on request, and
+breach obligations. This is not a paperwork exercise you can defer -- it shapes
+the schema.
+
+**The architecture reverts.** Multi-user means accounts, authentication,
+per-user isolation, and consent. That is precisely the shape of
+AURA-HealthOS -- NestJS, Postgres, Redis, magic links, a consent system -- which
+you already built once and abandoned because it did not fit. Publishing does not
+add features to the local app; it re-adds the infrastructure you just removed.
+
+**The model stops being free.** A 4-bit 14B is roughly 8-9 GB of weights. Two
+options, both bad:
+- Ship it -- a 9 GB first-run download. Technically allowed, miserable onboarding.
+- Host it -- and now you are renting GPUs. An always-on GPU instance is roughly
+  **$350-1,500/month** regardless of whether anyone uses it, or per-token API
+  pricing that scales with your user count. This is the single line item that
+  turns a £0 project into a monthly bill.
+
+**App Store review scrutiny.** Health apps get read carefully. Guideline 5.1.3
+restricts what you may do with health data; 1.4.1 covers apps that could present
+inaccurate medical information. An app whose selling point is AI-generated
+health insights will be looked at closely, and `OutputGuard` stops being a good
+idea and becomes the thing that gets you approved.
+
+**Asset rights.** Commissioned artwork needs explicit commercial rights, and
+AI-generated character art needs the generator's terms checked. Fine for
+personal use; a different conversation when distributed.
+
+### The cheap middle path
+
+If you later want a handful of people to use it without any of the above:
+**notarised direct download** -- a signed `.dmg` from GitHub Releases. Costs the
+$99/year, skips App Store review entirely, and still has no server, no accounts
+and no hosted model. Each person runs it locally on their own machine with their
+own data, exactly as you do.
+
+Without notarisation it is still distributable and still free, but users have to
+right-click-open past Gatekeeper.
+
+### The recommendation
+
+Build it local-only. Nothing about that decision is hard to reverse -- the module
+boundaries in `docs/ARCHITECTURE.md` are exactly what a future multi-user
+version would need anyway. But make that choice when you have something worth
+publishing, not before, because it costs you a compliance burden and a monthly
+bill in exchange for nothing you currently want.
+
 ## Running cost
 
 Zero. No API calls, no subscriptions, no hosting. The only ongoing consumption

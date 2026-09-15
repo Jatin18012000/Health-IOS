@@ -58,9 +58,15 @@ than that:
 
 | Unified memory | Practical choice | Notes |
 |---|---|---|
-| 16 GB | Qwen3.x 8B, 4-bit | Comfortable; leaves room for the app and the TTS model |
-| 24 GB | Qwen3.x 14B, 4-bit | Best quality-per-constraint at this tier |
+| 16 GB | Qwen3.x 8B, 4-bit | 14B fits but leaves little room for the TTS model and the app |
+| 24 GB | **Qwen3.x 14B, 4-bit** | **The default.** ~8-9 GB of weights, ~12 GB working |
 | 32 GB+ | Qwen3.8-27B class, 4-bit | ~18 GB download; 32 GB is the practical floor |
+
+**Qwen3.x 14B at 4-bit is the working default** -- the best quality that still
+leaves headroom for the neural TTS model, Whisper, and the app itself sharing
+the same unified memory. Remember that all four are resident at once during a
+spoken exchange; sizing the LLM as though it has the machine to itself is how
+you end up with a companion that stutters mid-sentence.
 
 MLX is the right runtime on Apple Silicon — measurably faster than the
 alternatives for models under ~14B, and it loads weights in-process so there is
