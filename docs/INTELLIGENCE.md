@@ -175,6 +175,25 @@ boundary. And mid-stream the buffer genuinely reads "Your HRV was 23." a moment
 before the next token makes it "23.8" — that is held, not released, which is the
 case that would otherwise speak a truncated number.
 
+## Citations
+
+The guard answers two questions from one pass, and for a long time only reported
+the first: *was any number invented?* and *where did each number come from?*
+
+Every sentence she says carries chips naming the figures it drew on. That is not
+decoration — it is the visible half of the arithmetic rule. If a number is on
+screen, there is a chip saying which computed figure it came from, and if there
+were no such figure the sentence would not have been shown at all.
+
+One chip per **figure**, not per numeral: "7h 35m" is two numerals from one
+fact. Ambiguity is resolved by ranking, which matters more than it sounds —
+before ranking, the 7 in "7h 35m" cited *steps*, because a 7,345-step baseline
+rounds to 7 thousand. A figure's own value identifies it outright; a baseline
+mean or a sample size barely identifies anything; and a numeral that
+corroborates an already-cited figure attaches to it rather than opening a
+second chip. A lone small number cites nothing — "a couple of days" is not a
+finding.
+
 A withheld sentence is never shown as her words and never silently swallowed:
 the transcript says one was held back and why. Otherwise it reads as her
 trailing off mid-thought.

@@ -26,7 +26,7 @@ What *is* verified, because it runs here:
 | Check | Result |
 |---|---|
 | `python3 tools/conformance.py` | **81/81** against the edge-case fixture |
-| `python3 tools/output_guard.py --self-test` | **11/11** worked examples |
+| `python3 tools/output_guard.py --self-test` | **12/12** worked examples |
 | `python3 tools/reference_pipeline.py` on the real export | 664,397 samples, 1,450 days, 33.9 MB |
 | `python3 tools/analytics.py` on the real export | score 62.8 for 13 Sep, components sane across 14 days |
 
@@ -111,10 +111,12 @@ of which would have been expensive to find later:
   notice when the guard withholds a sentence
 - ~~`SentenceStream`: guards each sentence before it is spoken~~ **written**,
   resolving the conflict between speaking early and checking first
-- **Remaining:** citation chips need `OutputGuard` to report which figures a
-  sentence *matched*, not only which it failed on. Then `swift build`, and a
-  first real generation to measure actual first-token latency against the
-  ~0.5 s the voice budget assumes.
+- ~~Citation chips~~ **written** — `OutputGuard` reports attributions, not just
+  rejections, ranked so an ambiguous small number corroborates rather than
+  mis-cites
+- **Remaining:** `swift build`, then a first real generation to measure actual
+  first-token latency against the ~0.5 s the voice budget assumes. That number
+  is the one assumption in this milestone that cannot be checked from here.
 - **Done when** she answers "how has my sleep been this year?" correctly, and
   every figure she states can be traced to a computed value.
 
