@@ -3,17 +3,18 @@ import AURACore
 
 /// The composite 0–100 on the dashboard.
 ///
-/// Each component is this person's own percentile for that day, so the score
-/// answers "how does today compare with my recent self" and nothing else. No
+/// Each component is this person's own percentile against their last year, so
+/// the score answers "how does today compare with my own year" and nothing. No
 /// population norms, no invented thresholds, no pretending to know what anyone's
 /// heart rate *should* be.
 ///
 /// **Known consequence, and it is a product decision rather than a bug:**
 /// percentiles are self-referential, so the score is centred on 50 by
 /// construction. Measured over four years of real data it runs mean ≈ 51 with a
-/// standard deviation of ≈ 16. That means **a sustained improvement never shows
-/// in it** — improve for eight weeks and your baseline improves with you.
-/// `docs/DECISIONS_PENDING.md` §1 lays out the alternatives.
+/// standard deviation of ≈ 14. That means **a sustained improvement is slow to
+/// show in it** — improve for eight weeks and your baseline follows you, just
+/// more slowly at 365 days than at 90. `docs/DECISIONS_PENDING.md` §1 records
+/// the decision and what it did and did not fix.
 public struct HealthScoreEngine: Sendable {
 
     let store: any AnalyticsStore
@@ -111,9 +112,9 @@ public struct HealthScoreEngine: Sendable {
             .filter { $0.isStaged == night.isStaged }
             .map(\.asleepMinutes)
 
-        guard let percentile = Stats.percentile(of: night.asleepMinutes, in: population) else {
-            return nil
-        }
+        guard population.count >= AnalyticsConfig.minBaselineSamples,
+              let percentile = Stats.percentile(of: night.asleepMinutes, in: population)
+        else { return nil }
         var score = percentile * 100
 
         // Efficiency only means something on a staged night. On an in-bed-only

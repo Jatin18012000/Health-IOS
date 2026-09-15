@@ -57,16 +57,19 @@ computes a delta, never judges a correlation. If a number appears in what she
 says, it was computed in Swift and passed in. `OutputGuard` cross-checks every
 numeral before anything is spoken.
 
-**Personal baselines, never population norms.** "Higher than your own last 90
-days" is a fact. "Above average for your age" is unlicensed medicine.
+**Personal baselines, never population norms.** "Higher than your own last year"
+is a fact. "Above average for your age" is unlicensed medicine. The baseline is
+365 days (`AnalyticsConfig.baselineDays`), and a percentile is suppressed below
+14 readings rather than ranking a day against three others.
 
 ## Known limitation, not a bug
 
 The composite score is percentile-based and therefore **centred on 50 by
-construction** — sustained improvement can never show in it, because improving
-moves the baseline too. Measured on real data: mean 51, sd 16. This is a
-deliberate trade recorded in `docs/DECISIONS_PENDING.md` §1, with the
-alternatives. Don't "fix" it without reading that.
+construction** — sustained improvement is slow to show in it, because improving
+moves the baseline too. The 365-day window slows that absorption rather than
+removing it. Measured on real data: mean 54, sd 14. This is a deliberate trade
+recorded in `docs/DECISIONS_PENDING.md` §1, along with the measurement showing
+it moved one score component out of four. Don't "fix" it without reading that.
 
 ## Environment
 

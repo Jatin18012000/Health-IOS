@@ -9,33 +9,44 @@ Ordered by how much the answer changes.
 
 ---
 
-## 1. The health score is self-referential, so it centres on 50
+## 1. ~~The health score baseline~~ — DECIDED: 365 days
 
-**This is the most consequential one, and it is a product decision rather than a
-technical one.**
+**Resolved 15 Sep 2026. Baseline widened from 90 days to 365.**
 
-Every score component is your own percentile against your last 90 days. That
-makes it honest — no population norms, no invented thresholds, no pretending to
-know what your heart rate "should" be. But percentiles are self-referential, so
-**the score is centred on 50 by construction.** Measured across your last
-14 days: mean 50.9, standard deviation 16.4, range 16.9–72.3.
+The reasoning is recorded below because what it fixed is narrower than the
+option promised, and that is worth knowing before anyone reopens it.
 
-The consequence: **you can never have a good month.** If you improve steadily
-for eight weeks, your baseline improves with you and the score stays around 50.
-It measures "today versus recent you", and it always will.
+Every score component is your own percentile against your own history — no
+population norms, no invented thresholds. Percentiles are self-referential, so
+the score is centred on 50 by construction: improve for eight weeks and your
+baseline improves with you. A year-long window does not remove that, it slows
+it down, because an improvement takes a year rather than three months to be
+absorbed into what it is measured against.
 
-| Option | What you get | What you lose |
-|---|---|---|
-| **A. Keep it as-is** *(current)* | Honest, personal, no invented norms | Sustained improvement never shows |
-| **B. Blend in absolute targets** | A good month reads as a good month | You pick the targets, and they are arbitrary |
-| **C. Widen the baseline to 365 days** | Improvement registers over months | Slow to react; your first year has no baseline |
+**Measured on your real data, the change moved one component out of four:**
 
-I chose A because it cannot lie to you. But B is a legitimate preference and
-plenty of people would rather have a number that rewards progress. **C is
-probably the best compromise** and is a one-constant change
-(`BASELINE_DAYS` in `tools/analytics.py`).
+| Component | 90-day | 365-day | Why |
+|---|---|---|---|
+| Activity | 91.4 | **93.7** | Steps went p79 → p86: the year behind you was less active than the quarter |
+| Sleep | 90.0 | 90.0 | Only **53 staged nights exist**, all since 13 Jul 2026 |
+| Heart | 36.1 | 36.1 | Resting HR has **61 readings**, first on 11 Aug 2025 |
+| Recovery | 5.6 | 5.6 | HRV has **62 readings**, same start date |
 
----
+Composite: 62.8 → **63.5**. Across 14 days, mean 53.3 → 54.2, sd 14.0 → 13.8.
+
+The three that did not move are the ones your Apple Watch produces, and it has
+not been worn for a year. **They will start benefiting as that history
+accumulates** — the change is right, it just has not paid off yet.
+
+Two things came out of making it:
+
+- The constants in `tools/analytics.py` were **not actually configurable**.
+  They were bound as default arguments, which Python evaluates at function
+  definition time, so changing one had no effect at all. Fixed.
+- A widened window makes a thin baseline *more* misleading, not less: it
+  advertises a year while a new sensor has a month. `MIN_BASELINE_SAMPLES = 14`
+  now suppresses a percentile rather than ranking a day against three others and
+  calling it the 100th.
 
 ## 2. Score weights
 
@@ -101,7 +112,8 @@ is worth more than any week of code.
 
 | Constant | Current | Note |
 |---|---|---|
-| `BASELINE_DAYS` | 90 | percentile window — see §1 |
+| `BASELINE_DAYS` | **365** | decided, see §1 |
+| `MIN_BASELINE_SAMPLES` | 14 | below this, no percentile is reported |
 | `COMPARISON_DAYS` | 30 | "vs your average" deltas |
 | `MIN_CORRELATION_N` | 30 | below this, no correlation is reported |
 | Correlation report threshold | \|r\| ≥ 0.2 | your steps × HRV is −0.30, so it reports |
@@ -122,3 +134,4 @@ is worth more than any week of code.
 - **Live2D over 3D, sprites as placeholder** — `docs/CHARACTER.md`
 - **Idempotency by index probe, not a unique index** — `docs/DATA_MODEL.md`;
   measured, the index cost 21.9 MB to enforce what a probe does for free
+- **365-day percentile baseline** — §1 above

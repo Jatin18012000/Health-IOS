@@ -113,7 +113,8 @@ public struct DashboardView: View {
 
         if percentile < 0.15 {
             return sleepPart + ", but your HRV is in the bottom "
-                + "\(Int(percentile * 100))% of your last 90 days. Recovery is low."
+                + "\(Int(percentile * 100))% of your \(hrv.baselineCount) readings. "
+                + "Recovery is low."
         }
         return sleepPart + "."
     }
@@ -214,7 +215,7 @@ public struct DashboardView: View {
                     HStack {
                         PanelLabel("Health score")
                         Spacer()
-                        Text("percentile vs your own 90 days")
+                        Text("percentile vs your own year")
                             .font(.system(size: 10))
                             .foregroundStyle(theme.textSecondary.opacity(0.7))
                     }
@@ -238,6 +239,17 @@ public struct DashboardView: View {
         }
     }
 
+    /// Names the real sample size rather than the window length.
+    ///
+    /// The baseline window is a year, but HRV only has 62 readings in it —
+    /// labelling that "your 365-day mean" would imply a density of data that
+    /// does not exist.
+    private var baselineCaption: String {
+        guard let hrv = model.figures.first(where: { $0.metric == "HeartRateVariabilitySDNN" })
+        else { return "" }
+        return "dashed line = your mean of \(hrv.baselineCount) readings"
+    }
+
     private var hrvPanel: some View {
         GlassPanel {
             VStack(alignment: .leading, spacing: 11) {
@@ -259,7 +271,7 @@ public struct DashboardView: View {
                               baseline: hrv.baselineMean,
                               highlightIndex: model.hrvWindow.count - 1)
                         .frame(height: 70)
-                    Text("dashed line = your 90-day mean")
+                    Text(baselineCaption)
                         .font(.system(size: 9.5))
                         .foregroundStyle(theme.textSecondary.opacity(0.6))
                 } else {

@@ -14,7 +14,7 @@ Two principles run through all of it:
   1. **Personal baselines, never population norms.** Every comparison is against
      this person's own history. A companion that says "your resting heart rate
      is above average for your age" is doing unlicensed medicine; one that says
-     "it's higher than your own last 90 days" is reporting a fact.
+     "it's higher than your own last year" is reporting a fact.
 
   2. **Say how much you know.** Every figure carries its sample size and every
      observation its confidence. With 1,450 days almost any two metrics
@@ -33,7 +33,14 @@ from datetime import date, timedelta
 # These are judgement calls, gathered here rather than scattered, because they
 # are the things most likely to want changing once a real person uses this.
 
-BASELINE_DAYS = 90        # window for personal percentiles
+BASELINE_DAYS = 365       # window for personal percentiles
+
+# Below this many readings, a percentile is not reported at all. Ranking a day
+# against three others and calling it "the 100th percentile" is a number with no
+# information in it, and widening BASELINE_DAYS makes this MORE likely to bite,
+# not less: the window now advertises a year while a sensor that arrived last
+# month still only has a month of data behind it.
+MIN_BASELINE_SAMPLES = 14
 COMPARISON_DAYS = 30      # window for "vs your average" deltas
 MIN_CORRELATION_N = 30    # below this, a correlation is not reported at all
 STRONG_CORRELATION = 0.5  # |r| at or above this is reported without hedging
@@ -120,8 +127,12 @@ def pearson(xs, ys):
 
 # ── the analyses ───────────────────────────────────────────────────────────
 
-def trend(db, metric, end_day, days=COMPARISON_DAYS):
+def trend(db, metric, end_day, days=None):
     """A window against the equivalent window immediately before it."""
+    # Resolved here, not in the signature: a default argument binds at function
+    # DEFINITION time, which silently froze every constant in this file at
+    # import and made them impossible to change.
+    days = days if days is not None else COMPARISON_DAYS
     end = date.fromisoformat(end_day)
     cur_start = end - timedelta(days=days - 1)
     prev_end = cur_start - timedelta(days=1)
@@ -152,8 +163,9 @@ def trend(db, metric, end_day, days=COMPARISON_DAYS):
     }
 
 
-def correlation(db, a, b, end_day, days=BASELINE_DAYS):
+def correlation(db, a, b, end_day, days=None):
     """Pearson's r between two metrics on days where both have a value."""
+    days = days if days is not None else BASELINE_DAYS
     end = date.fromisoformat(end_day)
     start = end - timedelta(days=days - 1)
     da, dbv = dict(series(db, a, start, end)), dict(series(db, b, start, end))
@@ -171,7 +183,8 @@ def correlation(db, a, b, end_day, days=BASELINE_DAYS):
     }
 
 
-def baseline(db, metric, end_day, days=BASELINE_DAYS):
+def baseline(db, metric, end_day, days=None):
+    days = days if days is not None else BASELINE_DAYS
     end = date.fromisoformat(end_day)
     return [v for _, v in series(db, metric, end - timedelta(days=days - 1), end)]
 
@@ -186,7 +199,7 @@ def figure(db, metric, end_day):
     value, unit = row
 
     pop = baseline(db, metric, end_day)
-    pct = percentile_of(value, pop)
+    pct = percentile_of(value, pop) if len(pop) >= MIN_BASELINE_SAMPLES else None
     if pct is not None and metric in LOWER_IS_BETTER:
         pct = 1 - pct
 
@@ -221,7 +234,8 @@ def sleep_figure(db, night_of):
     return {
         "asleep_min": asleep, "efficiency": eff, "staged": bool(staged),
         "deep_min": deep, "rem_min": rem,
-        "personal_percentile": percentile_of(asleep, pop),
+        "personal_percentile": (percentile_of(asleep, pop)
+                                if len(pop) >= MIN_BASELINE_SAMPLES else None),
         "baseline_n": len(pop),
     }
 

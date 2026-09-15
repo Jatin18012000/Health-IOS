@@ -69,12 +69,29 @@ public enum Stats {
 /// Tunable constants, gathered rather than scattered because they are the
 /// things most likely to want changing once a real person uses this.
 ///
-/// Several are open questions — see `docs/DECISIONS_PENDING.md`. The most
-/// consequential is `baselineDays`: a percentile score is self-referential and
-/// therefore centred on 50 by construction, so sustained improvement never
-/// shows in it. Widening this window is the cheapest partial fix.
+/// Several are open questions — see `docs/DECISIONS_PENDING.md`.
+///
+/// `baselineDays` is 365 by decision. A percentile score is self-referential and
+/// therefore centred on 50 by construction, so sustained improvement never shows
+/// in it; a year-long window is the cheapest partial fix, because it takes
+/// longer for an improvement to be absorbed into the baseline it is measured
+/// against.
+///
+/// It is a *partial* fix, and measurably so. On the reference data it moved the
+/// activity component (steps went from the 79th to the 86th percentile once the
+/// window covered a less active year) and moved nothing else, because HRV,
+/// resting heart rate and staged sleep have less than a year of history behind
+/// them. It will pay off for those components as the Watch accumulates history.
 public enum AnalyticsConfig {
-    public static var baselineDays = 90
+    public static var baselineDays = 365
+
+    /// Below this many readings, no percentile is produced.
+    ///
+    /// Ranking a day against three others and calling it "the 100th percentile"
+    /// is a number with no information in it. Widening `baselineDays` makes this
+    /// *more* likely to bite rather than less: the window now advertises a year
+    /// while a sensor that arrived last month still has only a month behind it.
+    public static var minBaselineSamples = 14
     public static var comparisonDays = 30
     public static var minCorrelationSamples = 30
     public static var strongCorrelation = 0.5

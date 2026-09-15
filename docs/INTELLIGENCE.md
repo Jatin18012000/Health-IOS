@@ -124,8 +124,9 @@ spending memory on.
 For a question, `AURAAnalytics` assembles:
 
 - the figures relevant to the window, with deltas against the comparison window
-- personal percentiles — **never population norms**, which would turn a
-  companion into an unlicensed diagnostician
+- personal percentiles against the last 365 days — **never population norms**,
+  which would turn a companion into an unlicensed diagnostician. Suppressed
+  below 14 readings, since ranking a day against three others says nothing.
 - observations with an explicit confidence
 - `missingDays`, so she can say "I only have four days of this week" instead of
   quietly averaging over a gap

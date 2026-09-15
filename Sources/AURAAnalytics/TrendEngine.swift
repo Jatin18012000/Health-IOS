@@ -10,8 +10,8 @@ import AURACore
 /// Two rules run through all of it:
 ///
 ///   1. **Personal baselines, never population norms.** Every comparison is
-///      against this person's own history. "Higher than your own last 90 days"
-///      is a fact; "above average for your age" is unlicensed medicine.
+///      against this person's own history. "Higher than your own last year" is
+///      a fact; "above average for your age" is unlicensed medicine.
 ///   2. **Say how much you know.** Every figure carries its sample size and
 ///      every observation its confidence. Over 1,450 days almost any two
 ///      metrics correlate weakly, and surfacing r = 0.11 as an insight is how a
@@ -117,7 +117,9 @@ public struct TrendEngine: Sendable {
               let spec = MetricCatalog[metric] else { return nil }
 
         let population = try await baseline(metric, endingOn: day)
-        var percentile = Stats.percentile(of: value, in: population)
+        var percentile = population.count >= AnalyticsConfig.minBaselineSamples
+            ? Stats.percentile(of: value, in: population)
+            : nil
         if AnalyticsConfig.lowerIsBetter.contains(metric), let p = percentile {
             percentile = 1 - p
         }
