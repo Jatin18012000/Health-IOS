@@ -100,13 +100,21 @@ of which would have been expensive to find later:
 - **Done when** she is on screen, reacting to your cursor and to your data, and
   still looks alive after you've watched her for two minutes.
 
-### M5 — She thinks · guard and brief written
+### M5 — She thinks · written, not yet compiled
 
-- MLX model loading, streaming completion — **remaining**
+- ~~MLX model loading, streaming completion~~ **written** against the current
+  `mlx-swift-lm` API (the loading API moved out of `mlx-swift-examples`)
 - ~~`HealthBrief` construction from `AURAAnalytics`~~ **written**
 - ~~`OutputGuard`: clinical patterns and numeral cross-checking~~ **written**,
   with the two holes prototyping found kept as tests
-- Chat UI with streaming — **remaining**
+- ~~Chat UI with streaming~~ **written** — transcript, interruption, honest
+  notice when the guard withholds a sentence
+- ~~`SentenceStream`: guards each sentence before it is spoken~~ **written**,
+  resolving the conflict between speaking early and checking first
+- **Remaining:** citation chips need `OutputGuard` to report which figures a
+  sentence *matched*, not only which it failed on. Then `swift build`, and a
+  first real generation to measure actual first-token latency against the
+  ~0.5 s the voice budget assumes.
 - **Done when** she answers "how has my sleep been this year?" correctly, and
   every figure she states can be traced to a computed value.
 

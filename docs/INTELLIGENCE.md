@@ -151,6 +151,34 @@ is the one that actually erodes trust, because it is plausible, specific and
 wrong. `OutputGuard` cross-checks every numeral in the output against the brief
 and rewrites or blocks on a mismatch.
 
+## Speaking before the answer is finished
+
+Two requirements in this project are in direct conflict:
+
+- `docs/VOICE.md`: she must **start speaking before generation finishes**. The
+  budget is about 1.5 seconds and waiting for a complete response blows it alone.
+- This document: **nothing is spoken before the guard has checked it.**
+
+Guarding only the finished text satisfies the second and breaks the first.
+Speaking tokens as they arrive does the reverse — by the time the guard rejects
+a figure, she has already said it out loud.
+
+**The sentence is the unit of release.** Each complete sentence is guarded the
+moment it closes, then either spoken or withheld. She begins after the first
+sentence rather than the last, and nothing unchecked reaches the speaker.
+
+That makes sentence boundaries safety-critical, which matters more than it
+sounds, because health prose is full of decimals. `SentenceStream` uses one
+rule: **a terminator only ends a sentence when the next character is
+whitespace.** In "23.8 ms" the period is followed by a digit, so it is never a
+boundary. And mid-stream the buffer genuinely reads "Your HRV was 23." a moment
+before the next token makes it "23.8" — that is held, not released, which is the
+case that would otherwise speak a truncated number.
+
+A withheld sentence is never shown as her words and never silently swallowed:
+the transcript says one was held back and why. Otherwise it reads as her
+trailing off mid-thought.
+
 ## Memory
 
 Without persistent memory she is a chatbot with a dashboard bolted on. Every

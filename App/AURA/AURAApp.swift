@@ -1,7 +1,10 @@
 import SwiftUI
 import AURACore
 import AURAStore
+import AURAAnalytics
 import AURADesign
+import AURAIntelligence
+import AURAVoice
 
 /// The app shell. Deliberately thin — views and wiring only.
 ///
@@ -21,7 +24,7 @@ struct AURAApp: App {
                     ProgressView().controlSize(.large)
 
                 case .ready(let store):
-                    DashboardView(model: DashboardViewModel(store: store))
+                    RootView(store: store, container: container)
 
                 case .failed(let message):
                     // A store that will not open is not something to paper over
@@ -53,6 +56,112 @@ struct AURAApp: App {
     }
 }
 
+/// Dashboard and conversation, sharing one store and one model.
+struct RootView: View {
+    @Environment(\.theme) private var theme
+    let store: SQLiteHealthStore
+    let container: AppContainer
+
+    @State private var section: Section = .overview
+
+    enum Section: String, CaseIterable, Identifiable {
+        case overview = "Overview"
+        case companion = "Companion"
+        var id: String { rawValue }
+        var icon: String {
+            switch self {
+            case .overview:  "square.grid.2x2"
+            case .companion: "bubble.left.and.text.bubble.right"
+            }
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            sidebar
+            Divider().overlay(theme.surfaceStroke)
+
+            switch section {
+            case .overview:
+                DashboardView(model: DashboardViewModel(store: store))
+            case .companion:
+                // Rebuilt per appearance rather than held: the conversation is
+                // deliberately not persistent yet. Memory is M7, and a
+                // transcript that survives navigation but not a relaunch would
+                // imply a continuity that does not exist.
+                ConversationView(model: ConversationViewModel(
+                    model: container.languageModel,
+                    briefBuilder: BriefBuilder(store: store),
+                    voice: container.voice,
+                    day: container.latestDay ?? CalendarDay(Date())))
+            }
+        }
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 10) {
+                Image(systemName: "waveform.circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(theme.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("AURA")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .tracking(1)
+                    Text("HEALTH COMPANION")
+                        .font(.system(size: 7.5, weight: .semibold))
+                        .tracking(1.2)
+                        .foregroundStyle(theme.textSecondary)
+                }
+            }
+            .padding(.horizontal, 20).padding(.bottom, 26)
+
+            ForEach(Section.allCases) { item in
+                Button { section = item } label: {
+                    HStack(spacing: 11) {
+                        Image(systemName: item.icon)
+                            .font(.system(size: 13))
+                            .frame(width: 18)
+                        Text(item.rawValue)
+                            .font(.system(size: 12,
+                                          weight: section == item ? .semibold : .regular))
+                        Spacer()
+                    }
+                    .foregroundStyle(section == item ? theme.textPrimary : theme.textSecondary)
+                    .padding(.horizontal, 12).padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 9)
+                        .fill(section == item ? theme.primary.opacity(0.13) : .clear))
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer()
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("LOCAL · OFFLINE")
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(1)
+                    .foregroundStyle(theme.textSecondary.opacity(0.7))
+                HStack(spacing: 7) {
+                    Circle()
+                        .fill(container.isModelReady ? theme.dataSeries[3] : theme.textSecondary)
+                        .frame(width: 6, height: 6)
+                    Text(container.isModelReady
+                         ? container.languageModel.identifier
+                         : "loading model…")
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(theme.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 20).padding(.bottom, 18)
+        }
+        .padding(.top, 26)
+        .frame(width: 196)
+        .background(theme.background)
+    }
+}
+
 /// Owns the store's lifetime.
 @Observable
 @MainActor
@@ -65,6 +174,33 @@ final class AppContainer {
     }
 
     private(set) var status: Status = .opening
+    private(set) var latestDay: CalendarDay?
+
+    /// One voice and one model for the app's lifetime.
+    ///
+    /// Not per-screen: the weights are gigabytes and loading them twice would
+    /// exhaust the memory budget that `docs/INTELLIGENCE.md` sizes to the byte.
+    ///
+    /// `@ObservationIgnored` because they are dependencies, not UI state — and
+    /// because `lazy` does not survive the `@Observable` macro's rewrite of
+    /// stored properties.
+    @ObservationIgnored let voice: any VoiceEngine = SystemVoice()
+    @ObservationIgnored let languageModel: any LanguageModel = {
+        #if canImport(MLXLLM)
+        MLXModel()
+        #else
+        UnavailableModel(
+            reason: "MLX is not available in this build, so the companion is offline. "
+                  + "The dashboard works normally.")
+        #endif
+    }()
+
+    /// Mirrors the model's readiness as observable state.
+    ///
+    /// `languageModel.isReady` is ignored by observation, so reading it in a
+    /// view body would render once and never update when the weights finish
+    /// loading — the status dot would sit grey forever.
+    private(set) var isModelReady = false
 
     /// One folder, under Application Support. Everything AURA knows lives here
     /// and nowhere else, so backing it up or deleting it is a single decision.
@@ -77,7 +213,19 @@ final class AppContainer {
     func open() async {
         guard case .opening = status else { return }
         do {
-            status = .ready(try SQLiteHealthStore(url: Self.storeURL))
+            let store = try SQLiteHealthStore(url: Self.storeURL)
+            latestDay = try await store.availableRange()?.end
+            status = .ready(store)
+
+            // Load the weights now rather than when she is first asked
+            // something. The first generation after a cold load pays several
+            // seconds for them, and paying that while she is meant to be
+            // answering is the difference between a companion and a progress
+            // bar. Failure here is not fatal -- the dashboard does not need it.
+            Task { [weak self, languageModel] in
+                try? await languageModel.warmUp()
+                await MainActor.run { self?.isModelReady = languageModel.isReady }
+            }
         } catch {
             status = .failed(error.localizedDescription)
         }
