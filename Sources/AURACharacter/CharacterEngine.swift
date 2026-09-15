@@ -56,12 +56,21 @@ public protocol CharacterRenderer: AnyObject, Sendable {
 public struct MoodResolver: Sendable {
     public init() {}
 
+    /// - Parameters:
+    ///   - recovery: the recovery score component, 0...100.
+    ///   - sleepHours: hours actually asleep.
+    ///   - activityPercentile: where today's activity sits against this
+    ///     person's own recent history, **0...1** — not progress toward a goal.
+    ///     A goal is a number someone picked; a percentile is a fact about them.
+    ///   - hour: local hour, 0...23.
     public func mood(recovery: Double?, sleepHours: Double?,
-                     stepProgress: Double?, hour: Int) -> CharacterMood {
+                     activityPercentile: Double?, hour: Int) -> CharacterMood {
+        // Order matters: the first matching rule wins, so the things worth
+        // interrupting for are checked before the things worth celebrating.
         if hour >= 22 || hour < 5 { return .sleepy }
         if let r = recovery, r < 50 { return .concerned }
         if let s = sleepHours, s < 5 { return .concerned }
-        if let p = stepProgress, p >= 1.0 { return .proud }
+        if let p = activityPercentile, p >= 0.9 { return .proud }
         if let r = recovery, r >= 85 { return .motivated }
         if let s = sleepHours, s >= 7 { return .calm }
         return .neutral

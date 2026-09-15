@@ -188,7 +188,7 @@ public struct DashboardView: View {
         MoodResolver().mood(
             recovery: model.score?.components[.recovery],
             sleepHours: model.night.map { $0.asleepMinutes / 60 },
-            stepProgress: model.figures
+            activityPercentile: model.figures
                 .first { $0.metric == "StepCount" }?.personalPercentile,
             hour: Calendar.current.component(.hour, from: .now))
     }
