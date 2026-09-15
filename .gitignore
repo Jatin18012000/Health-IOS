@@ -1,0 +1,22 @@
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Health data never belongs in version control.
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.parquet
+export.xml
+export_cda.xml
+apple_health_export/
+/Fixtures/real/
+
+# Model weights
+*.safetensors
+*.gguf
+*.mlmodelc/
+Models/
