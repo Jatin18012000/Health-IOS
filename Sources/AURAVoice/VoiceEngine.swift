@@ -5,8 +5,9 @@ import Foundation
 ///
 /// Three conformers are planned, in this order (docs/VOICE.md):
 ///
-///   1. `SystemVoice`  -- AVSpeechSynthesizer. Free, offline, zero setup,
-///      ships in M3 so she can talk on day one. Sounds like a system voice.
+///   1. `SystemVoice`  -- AVSpeechSynthesizer. Free, offline, zero setup.
+///      Implemented. Sounds like a system voice, which is the point: having her
+///      speak early is what tells you whether the rest of the illusion works.
 ///   2. `NeuralVoice`  -- a local neural model (Kokoro / Piper class) running
 ///      on the Neural Engine. Still fully offline, dramatically warmer, and
 ///      the one that makes her feel like a character rather than a screen
@@ -21,6 +22,10 @@ public protocol VoiceEngine: AnyObject, Sendable {
     /// mouth flaps on a timer and the illusion collapses immediately.
     func speak(_ text: String, onLevel: @escaping @Sendable (Double) -> Void) async throws
 
+    /// Stop immediately, cutting the audio rather than fading it.
+    ///
+    /// She must stop the moment you start talking. A companion that politely
+    /// finishes its sentence over you is irritating within one conversation.
     func stop()
 
     var isSpeaking: Bool { get }

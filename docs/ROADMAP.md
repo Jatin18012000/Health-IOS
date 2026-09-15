@@ -72,9 +72,11 @@ track unblocked until the rig exists, not a competing approach.
 - **Done when** she answers "how has my sleep been this year?" correctly, and
   every figure she states can be traced to a computed value.
 
-### M6 — She speaks and listens · ~2 weeks
+### M6 — She speaks and listens · voice engine written
 
-- `SystemVoice` with the amplitude stream driving her mouth
+- ~~`SystemVoice` with the amplitude stream driving her mouth~~ **written**,
+  rendering to buffers and tapping the playing node so levels are emitted in
+  step with what is audible rather than as the synthesiser renders ahead
 - WhisperKit push-to-talk
 - Interruption handling
 - **Done when** you can hold a spoken conversation and she stops the moment you
