@@ -33,20 +33,60 @@ impact per hour of work:
 5. **Entrances and exits.** She should arrive when the app opens and settle when
    idle, not simply exist. Transitions are what make a figure inhabit a space.
 
-## The sprite placeholder (M4)
+## The placeholder (M4): one image, continuous motion
 
-The five states in the design mockups — idle · stretch · cheer · focus ·
-good night — cross-faded, with procedural motion layered on top:
+**Not a five-pose sprite sheet.** That was the original plan and it is wrong for
+a specific reason worth recording.
 
-- breathing: slow vertical scale, ~0.5% amplitude, 4–6 s period with jitter
-- blink: 2-frame overlay, random 3–7 s interval
-- parallax: layer offsets toward the cursor, clamped
-- speech glow: rim light modulated by the audio level
-- mouth: 3–4 frames selected by amplitude bands
+### Why the pose sheet doesn't work
 
-That combination is convincing enough to ship, and it works with the artwork you
-already have. Budget: keep the whole stage under ~2 ms per frame so it never
-competes with the LLM for the GPU.
+The five poses in the design mockup — idle / stretch / cheer / focus /
+good night — were AI-generated, and they are **not quite the same character**.
+The jacket detailing, hair fall and face proportions drift between them. That is
+inherent to image generation: each render is a new image, not the same character
+posed differently. Cutting between them reads as a glitch, not an animation, and
+the drift is more noticeable in motion than side by side in a grid.
+
+Regenerating more poses does not fix it. Consistency is the thing generation
+cannot give you, and it is exactly what an animation needs.
+
+### What to do instead
+
+**Take the single strongest image and drive everything procedurally.** No pose
+swaps at all:
+
+- **Breathing** — slow vertical scale, ~0.5% amplitude, 4–6 s period with jitter
+- **Idle sway** — small rotation and horizontal drift on a slower, independent
+  cycle, so the two never visibly sync
+- **Parallax depth** — even a rough three-layer cut (hair-back / body /
+  hair-front) gives real depth on cursor movement, and is hours of work rather
+  than the full 40-layer separation
+- **Blink** — a single eyelid overlay on a random 3–7 s interval
+- **Mouth** — a small overlay region driven by the audio amplitude
+- **Glow and rim light** — modulated by her speech level and tinted by mood
+
+**Mood becomes lighting and posture, not a different picture.** Concerned is a
+cooler rim light and a slight forward lean; proud is a warmer glow and a lift.
+Mood changes what the *same* image looks like, which sidesteps the consistency
+problem entirely and is more convincing than a hard cut between two drawings.
+
+### Why this is better preparation for Live2D
+
+The pose-sheet approach and Live2D are different mental models — discrete frames
+versus continuous parameters. Building the placeholder procedurally means you
+are already thinking in the target model:
+
+| Placeholder | Live2D |
+|---|---|
+| rotation / drift | `ParamAngleX/Y/Z` |
+| amplitude → mouth overlay | amplitude → `ParamMouthOpenY` |
+| eyelid overlay | `ParamEyeLOpen` / `ParamEyeROpen` |
+| parallax offset | `ParamEyeBallX/Y` + `ParamBodyAngleX` |
+| breathing scale | `ParamBreath` |
+
+Every line maps. When the rig lands, the driving code barely changes — a new
+`CharacterRenderer` conformer consumes the same signals. A sprite sheet would
+have thrown all of that away.
 
 ## Decision: Live2D, not 3D
 
@@ -170,19 +210,23 @@ Two reasons it earns its place:
 
 ```
 ~/Library/Application Support/AURA/character/
-  sprites/
-    idle/ stretch/ cheer/ focus/ goodnight/
-    mouth/       0.png 1.png 2.png 3.png
-    blink/
-  live2d/        model3.json, moc3, textures  (version two)
-  manifest.json  which renderer, which assets, which moods map to which poses
+  procedural/
+    base.png        the single chosen illustration
+    hair-back.png   rough three-layer cut for parallax
+    hair-front.png
+    mouth/          a few overlay frames driven by audio amplitude
+    eyelids.png
+  live2d/           model3.json, moc3, textures  (when the rig lands)
+  manifest.json     which renderer, which assets, mood -> lighting mapping
 ```
 
 The manifest is what lets the renderer be swapped without a rebuild.
 
 ## What to avoid
 
-- **A single static image with a glow.** Obvious within about four seconds.
+- **A single static image with a glow.** Obvious within about four seconds. The
+  procedural approach above is the opposite of this: one image, but never still.
+- **Cutting between AI-generated poses.** The character drift reads as a glitch.
 - **Random mood changes.** Presence comes from her reacting to *you*; randomness
   reads as broken.
 - **Constant motion.** Stillness between movements is what makes movement mean
