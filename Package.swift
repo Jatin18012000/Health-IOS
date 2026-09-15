@@ -31,10 +31,13 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
 
-        // Uncommented at the milestones that need them -- kept out of the
-        // initial graph so a fresh clone builds fast with no large checkouts.
-        // M5 (local LLM):   .package(url: "https://github.com/ml-explore/mlx-swift-examples", from: "2.0.0"),
-        // M6 (speech-to-text): .package(url: "https://github.com/argmaxinc/WhisperKit", from: "0.9.0"),
+        // The local LLM. Note this is mlx-swift-lm, NOT the older
+        // mlx-swift-examples -- the model-loading API moved there and the
+        // factory call changed shape with it.
+        .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "2.21.0"),
+
+        // M6 (speech-to-text), uncommented when Whisper lands:
+        // .package(url: "https://github.com/argmaxinc/WhisperKit", from: "0.9.0"),
     ],
     targets: [
         // Domain vocabulary. Depends on nothing. Everything depends on it.
@@ -55,7 +58,16 @@ let package = Package(
         .target(name: "AURAAnalytics", dependencies: ["AURACore", "AURAStore"]),
 
         // LLM provider abstraction, context building, output safety.
-        .target(name: "AURAIntelligence", dependencies: ["AURACore", "AURAAnalytics"]),
+        //
+        // MLX is linked here, but MLXModel is behind `#if canImport(MLXLLM)`
+        // so the module still builds and tests without it -- the guard, the
+        // brief and the sentence stream are all testable with no weights on
+        // the machine.
+        .target(name: "AURAIntelligence", dependencies: [
+            "AURACore", "AURAAnalytics",
+            .product(name: "MLXLLM", package: "mlx-swift-lm"),
+            .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+        ]),
 
         // Text-to-speech, speech-to-text, and the audio level tap that drives
         // her mouth. Protocol-first so the engine can be swapped.
