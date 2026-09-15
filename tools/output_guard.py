@@ -104,6 +104,17 @@ def allowed_numbers(brief):
         add(figure.get("personal_percentile"), "fraction")
         add(figure.get("baseline_n"), "plain")
 
+    # Goals and the progress against them. Without this the guard blocks her
+    # from saying "you passed your 8,000 step goal" -- which is true, computed,
+    # and exactly the kind of thing a companion should say.
+    for goal in brief.get("goals", []):
+        add(goal.get("target"), "count")
+        add(goal.get("value"), "count")
+        add(goal.get("percent"), "percent")
+        # The shortfall or surplus, which is the natural way to phrase it.
+        if isinstance(goal.get("value"), (int, float)) and isinstance(goal.get("target"), (int, float)):
+            add(abs(goal["value"] - goal["target"]), "count")
+
     sleep = brief.get("sleep") or {}
     for key in ("asleep_min", "core_min", "deep_min", "rem_min", "awake_min"):
         add(sleep.get(key), "duration_minutes")
@@ -179,7 +190,9 @@ BRIEF = {
     ],
     "sleep": {"asleep_min": 455.0, "efficiency": 95.4, "deep_min": 76.0,
               "rem_min": 113.0, "personal_percentile": 0.88, "baseline_n": 53},
-    "score": {"value": 62.8, "components": {"activity": 91.4, "recovery": 5.6}},
+    "score": {"value": 63.5, "components": {"activity": 93.7, "recovery": 5.6}},
+    "goals": [{"metric": "StepCount", "target": 8000, "value": 10171.6,
+               "percent": 127.1, "met": True}],
     "observations": [{"text": "StepCount and HRV move oppositely (r=-0.30, n=62)",
                       "confidence": 0.6}],
 }
@@ -194,8 +207,10 @@ CASES = [
      None, None, "thousands shorthand and rounding"),
     ("Steps and HRV move oppositely (r=-0.30 across 62 days).",
      None, None, "a correlation carried from the observations"),
-    ("Your score is 62.8, with activity at 91 and recovery at 6.",
+    ("Your score is 63.5, with activity at 94 and recovery at 6.",
      None, None, "score and components, rounded"),
+    ("You passed your 8,000 step goal — 10,172, about 127% of it.",
+     None, None, "goal, progress and surplus are all computed and carried"),
 
     ("Your HRV was 31.2 ms last night.",
      "fabricated_figure", "31.2", "plausible, specific, computed by nobody"),

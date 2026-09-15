@@ -33,14 +33,18 @@ public struct BriefBuilder: Sendable {
         ("TimeInDaylight", "HeartRateVariabilitySDNN"),
     ]
 
-    public init(store: any AnalyticsStore) {
+    let goals: Goals
+
+    public init(store: any AnalyticsStore, goals: Goals = .default) {
         self.trends = TrendEngine(store: store)
         self.scores = HealthScoreEngine(store: store)
+        self.goals = goals
     }
 
     public func brief(for day: CalendarDay,
                       window: Int = AnalyticsConfig.comparisonDays) async throws -> HealthBrief {
         var figures: [HealthBrief.Figure] = []
+        var goalProgress: [HealthBrief.GoalProgress] = []
         var observations: [HealthBrief.Observation] = []
 
         for metric in Self.headline {
@@ -49,6 +53,12 @@ public struct BriefBuilder: Sendable {
                 metric: f.metric, label: f.title, value: f.value,
                 unit: f.unit.rawValue, changePercent: f.changePercent,
                 personalPercentile: f.personalPercentile))
+
+            if let p = goals.progress(for: f.metric, value: f.value) {
+                goalProgress.append(HealthBrief.GoalProgress(
+                    metric: f.metric, label: f.title, target: p.target,
+                    value: p.value, percent: p.percent, isMet: p.isMet))
+            }
 
             // An anomaly is "unusual for you", measured against your own median
             // and MAD — not against anybody else.
@@ -78,6 +88,7 @@ public struct BriefBuilder: Sendable {
             range: range,
             comparisonRange: DayRange.lastDays(window, endingOn: range.start.adding(days: -1)),
             figures: figures,
+            goals: goalProgress,
             observations: observations.sorted { $0.confidence > $1.confidence },
             // So she can say "I only have four days of this week" rather than
             // quietly averaging over a gap.

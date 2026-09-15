@@ -34,6 +34,7 @@ public final class DashboardViewModel {
     public private(set) var yearlySteps: [YearValue] = []
     public private(set) var hrvWindow: [DayValue] = []
     public private(set) var stepsSourceCount: Int = 1
+    public private(set) var stepGoal: Goals.Progress?
 
     // MARK: Presentation types
 
@@ -65,8 +66,15 @@ public final class DashboardViewModel {
     private let trends: TrendEngine
     private let scores: HealthScoreEngine
 
-    public init(store: any AnalyticsStore, day: CalendarDay = CalendarDay(Date())) {
+    /// User preference, not a statistic. Deliberately not consulted by
+    /// `TrendEngine` or `HealthScoreEngine` — a goal must never move a figure
+    /// that is supposed to describe reality.
+    public var goals: Goals
+
+    public init(store: any AnalyticsStore, goals: Goals = .default,
+                day: CalendarDay = CalendarDay(Date())) {
         self.store = store
+        self.goals = goals
         self.trends = TrendEngine(store: store)
         self.scores = HealthScoreEngine(store: store)
         self.day = day
@@ -129,6 +137,8 @@ public final class DashboardViewModel {
             row.value.map { DayValue(day: row.day, value: $0) }
         }
         stepsSourceCount = stepRows.first { $0.day == day }?.sourceCount ?? 1
+        stepGoal = stepRows.first { $0.day == day }?.value
+            .flatMap { goals.progress(for: "StepCount", value: $0) }
 
         let hrvRange = DayRange.lastDays(7, endingOn: day)
         hrvWindow = try await store.daily(metric: "HeartRateVariabilitySDNN", in: hrvRange)

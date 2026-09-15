@@ -57,6 +57,14 @@ computes a delta, never judges a correlation. If a number appears in what she
 says, it was computed in Swift and passed in. `OutputGuard` cross-checks every
 numeral before anything is spoken.
 
+**Goals never touch the analytics.** `Goals` in `AURACore` is a user preference
+and `AnalyticsConfig` holds statistical tunables; they are separate types on
+purpose. Percentiles and the composite score do not consult goals at all — a
+goal is a number someone picked, a percentile is a fact about the person, and
+letting the first move the second corrupts a figure meant to describe reality.
+Goal progress *is* carried in the `HealthBrief`, so `OutputGuard` permits her to
+state it.
+
 **Personal baselines, never population norms.** "Higher than your own last year"
 is a fact. "Above average for your age" is unlicensed medicine. The baseline is
 365 days (`AnalyticsConfig.baselineDays`), and a percentile is suppressed below

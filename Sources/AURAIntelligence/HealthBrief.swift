@@ -49,19 +49,47 @@ public struct HealthBrief: Codable, Sendable {
         public let confidence: Double
     }
 
+    /// A target and the day's progress against it.
+    ///
+    /// Carried in the brief rather than left to the UI so that `OutputGuard`
+    /// permits her to state it. Without this she is blocked from saying "you
+    /// passed your 8,000 step goal" — true, computed, and exactly what a
+    /// companion should say.
+    public struct GoalProgress: Codable, Sendable {
+        public let metric: String
+        public let label: String
+        public let target: Double
+        public let value: Double
+        public let percent: Double
+        public let isMet: Bool
+
+        public init(metric: String, label: String, target: Double,
+                    value: Double, percent: Double, isMet: Bool) {
+            self.metric = metric
+            self.label = label
+            self.target = target
+            self.value = value
+            self.percent = percent
+            self.isMet = isMet
+        }
+    }
+
     public let range: DayRange
     public let comparisonRange: DayRange?
     public let figures: [Figure]
+    public let goals: [GoalProgress]
     public let observations: [Observation]
     /// Days in `range` with no data, so she can say "I only have four days of
     /// this week" instead of quietly averaging over a gap.
     public let missingDays: Int
 
     public init(range: DayRange, comparisonRange: DayRange?, figures: [Figure],
-                observations: [Observation], missingDays: Int) {
+                goals: [GoalProgress] = [], observations: [Observation],
+                missingDays: Int) {
         self.range = range
         self.comparisonRange = comparisonRange
         self.figures = figures
+        self.goals = goals
         self.observations = observations
         self.missingDays = missingDays
     }

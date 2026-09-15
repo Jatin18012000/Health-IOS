@@ -134,6 +134,17 @@ public struct OutputGuard: Sendable {
             add(figure.personalPercentile, .fraction)
         }
 
+        // Goals and progress against them. Without this the guard blocks her
+        // from saying "you passed your 8,000 step goal", which is true and
+        // computed — a safety check that rejects honest statements is a defect,
+        // not caution.
+        for goal in brief.goals {
+            add(goal.target, .count)
+            add(goal.value, .count)
+            add(goal.percent, .percent)
+            add(abs(goal.value - goal.target), .count)
+        }
+
         // Coefficients and sample sizes already quoted in the observations —
         // she may repeat what the analysis handed her.
         for observation in brief.observations {

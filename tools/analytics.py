@@ -50,6 +50,19 @@ PARTIAL_DAY_THRESHOLD = 0.9   # below this share of a day elapsed, do not publis
 # Composite score weights. PROVISIONAL — see docs/DECISIONS_PENDING.md.
 SCORE_WEIGHTS = {"activity": 0.30, "sleep": 0.30, "heart": 0.20, "recovery": 0.20}
 
+# Daily goals. A PREFERENCE, not a statistic — which is why it sits apart from
+# the tunables above and why nothing here is derived from it. Percentiles and
+# scores deliberately ignore goals entirely: a goal is a number someone picked,
+# a percentile is a fact about the person.
+#
+# 8,000 rather than the customary 10,000. That figure comes from a 1960s
+# Japanese pedometer marketing campaign, not from any clinical threshold, and
+# the reference user's own 365-day mean is 6,340 — a goal cleared four days in
+# ten motivates worse than one cleared eight days in ten.
+GOALS = {
+    "StepCount": 8000,
+}
+
 # Metrics where a LOWER value is the better one, so the percentile inverts.
 LOWER_IS_BETTER = {"RestingHeartRate", "WalkingHeartRateAverage",
                    "AppleSleepingBreathingDisturbances"}
@@ -364,9 +377,22 @@ def brief(db, day):
                 "confidence": round(c["confidence"], 2),
             })
 
+    goals = []
+    for metric, target in GOALS.items():
+        row = db.execute(
+            "SELECT value FROM daily_metrics WHERE day = ? AND identifier = ?",
+            (day, metric)).fetchone()
+        if row and row[0] is not None:
+            goals.append({
+                "metric": metric, "target": target, "value": row[0],
+                "percent": round(row[0] / target * 100, 1),
+                "met": row[0] >= target,
+            })
+
     return {
         "day": day,
         "figures": figures,
+        "goals": goals,
         "sleep": sleep_figure(db, day),
         "score": health_score(db, day),
         "observations": observations,

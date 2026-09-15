@@ -142,7 +142,17 @@ public struct DashboardView: View {
 
             GlassPanel {
                 VStack(alignment: .leading, spacing: 12) {
-                    PanelLabel("Steps · 7 days")
+                    HStack {
+                        PanelLabel("Steps · 7 days")
+                        Spacer()
+                        if let goal = model.stepGoal {
+                            // Naming the target alongside the percentage: "127%"
+                            // alone is meaningless without knowing of what.
+                            Text("\(Int(goal.percent))% of \(goal.target.formatted(.number.precision(.fractionLength(0))))")
+                                .font(.system(size: 10))
+                                .foregroundStyle(goal.isMet ? theme.dataSeries[3] : theme.textSecondary)
+                        }
+                    }
                     if model.weekSteps.isEmpty {
                         EmptyMetricState("No step data in this window.")
                     } else {

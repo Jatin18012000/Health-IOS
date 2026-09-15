@@ -60,17 +60,34 @@ mis-weighted score is visible rather than hidden.
 
 ---
 
-## 3. Your step goal
+## 3. ~~Your step goal~~ — DECIDED: 8,000
 
-The dashboard assumes **10,000**. Worth knowing before you confirm it: your
-actual 90-day mean is **7,345**, and your four-year average has ranged from
-9,008 (2022) down to 5,836 (2025) and back to 6,478 this year.
+**Resolved 15 Sep 2026. Changed from 10,000 to 8,000.**
 
-10,000 is a marketing number from a 1960s pedometer campaign, not a clinical
-threshold. A goal you clear four days in ten is arguably worse than one you
-clear eight days in ten. **8,000 would fit your actual life better.** Your call.
+10,000 comes from a 1960s Japanese pedometer marketing campaign — *manpo-kei*,
+"ten thousand step meter" — and has no clinical basis. Against your own 365-day
+mean of 6,340, a 10,000 target is cleared roughly four days in ten; 8,000 is
+reachable often enough that missing it means something.
 
----
+On 13 September you walked 10,172 — **127% of 8,000**.
+
+Implementing it turned out to be more than a constant, because the goal did not
+previously exist anywhere except as a hardcoded string in the mockup:
+
+- `Goals` in `AURACore` is a **preference**, deliberately separate from
+  `AnalyticsConfig`'s statistical tunables. Nothing in the analytics layer
+  consults it: percentiles and the composite score ignore goals entirely,
+  because a goal is a number someone picked and a percentile is a fact about
+  you. Letting an arbitrary target move a figure meant to describe reality is
+  exactly the failure this separation prevents.
+- Goal progress had to be carried in the **`HealthBrief`**, not just rendered.
+  `OutputGuard` was verified to block "you passed your 8,000 step goal" — true,
+  computed, and precisely what a companion should say. A safety check that
+  rejects honest statements is a defect, not caution.
+
+Exercise and sleep goals exist in the type but are **unset by default**: an
+unset goal shows no ring rather than a target nobody chose, and sleep in
+particular responds badly to being treated as a number to hit.
 
 ## 4. The low-trust sources
 
@@ -119,6 +136,7 @@ is worth more than any week of code.
 | Correlation report threshold | \|r\| ≥ 0.2 | your steps × HRV is −0.30, so it reports |
 | `OUTLIER_Z` | 3.5 | modified z-score for "unusual for you" |
 | `PARTIAL_DAY_THRESHOLD` | 0.9 | below this share of a day elapsed, no score |
+| `Goals.dailySteps` | **8,000** | decided, see §3 |
 | `SLEEP_DAY_CUTOFF_HOUR` | 18:00 | a session ending before this belongs to the previous night |
 
 ---
@@ -135,3 +153,4 @@ is worth more than any week of code.
 - **Idempotency by index probe, not a unique index** — `docs/DATA_MODEL.md`;
   measured, the index cost 21.9 MB to enforce what a probe does for free
 - **365-day percentile baseline** — §1 above
+- **8,000 step goal, kept out of the analytics** — §3 above
