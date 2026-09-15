@@ -15,14 +15,49 @@ track unblocked until the rig exists, not a competing approach.
 
 ---
 
-### M0 — Foundations (done)
+## Where this actually is
+
+Everything below is written and committed. **None of the Swift has been
+compiled** — there is no toolchain in the environment it was written in, so
+`swift build` is the first thing to do on the Mac, and expect to fix things.
+
+What *is* verified, because it runs here:
+
+| Check | Result |
+|---|---|
+| `python3 tools/conformance.py` | **81/81** against the edge-case fixture |
+| `python3 tools/output_guard.py --self-test` | **11/11** worked examples |
+| `python3 tools/reference_pipeline.py` on the real export | 664,397 samples, 1,450 days, 33.9 MB |
+| `python3 tools/analytics.py` on the real export | score 62.8 for 13 Sep, components sane across 14 days |
+
+The Python tools are not scratch work — they are the specification the Swift is
+a port of, and `Tests/AURAIngestTests/ConformanceTests.swift` asserts against
+the same `expected.json` the Python suite does, so the two cannot drift apart
+without one side going red.
+
+**Four bugs were found by building the reference implementations first**, each
+of which would have been expensive to find later:
+
+1. XML entities were not decoded, so the Apple Watch ranked as an unknown
+   source and every deduplicated total silently inverted.
+2. Ingest was not idempotent — re-importing would have doubled every day.
+3. A relative tolerance in the output guard let a fabricated resting heart rate
+   of 58 bpm through, for a metric that was not in the brief at all.
+4. Untyped derivations in the same guard let a fabricated HRV of 31.2 ms
+   through, via a score component's remainder.
+
+---
+
+### M0 — Foundations · done
 
 - Repository structure, module boundaries, Swift package graph
 - Metric catalog derived from a real export: 40 types, units, aggregation rules
 - `SourceResolver` deduplication algorithm
-- `tools/reference_pipeline.py` — executable specification, validated against
-  664,515 real records
-- Architecture and data-model documentation
+- `tools/reference_pipeline.py` and `tools/analytics.py` — executable
+  specifications, validated against 664,515 real records
+- `Tests/Fixtures/edge-cases` + `tools/conformance.py` — 81 hand-computed
+  assertions, asserted by both languages
+- Architecture, data-model, character, voice, intelligence and cost docs
 
 ### M1 — Store · written, not yet compiled
 
@@ -55,20 +90,23 @@ track unblocked until the rig exists, not a competing approach.
 - **Done when** the dashboard in the mockups is on screen with real numbers from
   four years of data, and nothing displayed is invented.
 
-### M4 — She appears · ~2–3 weeks
+### M4 — She appears · renderer written
 
-- `SpriteRenderer`: pose cross-fade, breathing, blink, parallax, mouth frames
-- `MoodResolver` wired to the day's real figures
+- ~~`ProceduralRenderer`: breathing, sway, blink, parallax, amplitude-driven
+  mouth, mood as light and posture~~ **written**
+- ~~`MoodResolver` wired to the day's real figures~~ **written**
+- Remaining: the artwork itself, and the three-layer parallax cut
 - Entrance and idle-settle transitions
 - **Done when** she is on screen, reacting to your cursor and to your data, and
   still looks alive after you've watched her for two minutes.
 
-### M5 — She thinks · ~2 weeks
+### M5 — She thinks · guard and brief written
 
-- MLX model loading, streaming completion
-- `HealthBrief` construction from `AURAAnalytics`
-- `OutputGuard`: clinical-language patterns and numeral cross-checking
-- Chat UI with streaming
+- MLX model loading, streaming completion — **remaining**
+- ~~`HealthBrief` construction from `AURAAnalytics`~~ **written**
+- ~~`OutputGuard`: clinical patterns and numeral cross-checking~~ **written**,
+  with the two holes prototyping found kept as tests
+- Chat UI with streaming — **remaining**
 - **Done when** she answers "how has my sleep been this year?" correctly, and
   every figure she states can be traced to a computed value.
 
