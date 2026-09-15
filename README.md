@@ -40,16 +40,23 @@ python3 tools/reference_pipeline.py ~/Downloads/apple_health_export --out aura.s
 On the reference export that produces:
 
 ```
-parsed 664,515 usable samples
-stored 664,515 samples across 6 sources and 2175 devices
+ignored 118 duplicate records
+parsed 664,397 usable samples
+stored 664,397 samples across 6 sources and 2175 devices
 built 14,597 daily metric rows (471 required multi-source deduplication)
 reconstructed 819 nights (53 with real sleep staging, 766 in-bed only)
-wrote aura.sqlite (34.1 MB)
+wrote aura.sqlite (33.9 MB)
 covering 2022-09-27 -> 2026-09-15 (1,450 days)
 ```
 
 293 MB of XML becomes a 34 MB database where every dashboard query returns in
 under 10 ms.
+
+`tools/conformance.py` runs the same pipeline against a small hand-built fixture
+covering every edge case — multi-source overlap, `Cal` vs `kcal`, `count/min`
+meaning two different things, both sleep eras, entity-encoded source names,
+unknown units and re-import idempotency — and asserts 81 hand-computed
+expectations. It is the acceptance test the Swift store has to pass.
 
 ## Layout
 

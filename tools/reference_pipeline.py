@@ -23,6 +23,7 @@ Design notes live in docs/DATA_MODEL.md. The two rules that matter most:
 """
 
 import argparse
+import html
 import os
 import re
 import sqlite3
@@ -145,6 +146,20 @@ def parse_date(s):
     return datetime.strptime(s, "%Y-%m-%d %H:%M:%S %z")
 
 
+def unescape_attrs(attrs):
+    """Decode XML entities in attribute values.
+
+    Not optional. Apple writes `device="&lt;&lt;HKDevice: 0x...&gt;"` on nearly
+    every wearable sample, and a source name containing `&` or a non-breaking
+    space arrives entity-encoded. Leaving them encoded means `sourceName`
+    comparisons silently fail -- which demotes the most trustworthy device to
+    "unknown" and inverts the whole deduplication result.
+
+    The Swift port gets this for free: XMLParser decodes entities itself.
+    """
+    return {k: html.unescape(v) for k, v in attrs.items()}
+
+
 def iter_records(path):
     """Streaming line-oriented scan. The export is one Record per line and can
     be 300 MB+, so we never build a DOM. The Swift port uses XMLParser (SAX),
@@ -154,7 +169,7 @@ def iter_records(path):
             m = RECORD_RX.search(line)
             if not m:
                 continue
-            attrs = dict(ATTR_RX.findall(m.group("attrs")))
+            attrs = unescape_attrs(dict(ATTR_RX.findall(m.group("attrs"))))
             yield m.group(1), attrs
 
 
@@ -270,6 +285,37 @@ def sleep_night_of(session_end):
     return d
 
 
+def insert_samples(conn, rows, metric_id, source_id, device_id):
+    """Insert samples, skipping any that are already stored.
+
+    Every Apple Health export contains ALL history, so the second import is
+    ~99% records already present. That is the normal case, not an error, and it
+    must be a cheap no-op rather than a doubled day.
+
+    The NOT EXISTS guard probes idx_samples_metric_start -- (metric_id,
+    start_at) narrows to a handful of rows before the remaining columns are
+    compared -- so idempotency costs an indexed lookup per candidate row at
+    import time and nothing at all in stored bytes.
+
+    `IS` rather than `=` on value and category: both are nullable, and `=`
+    never matches NULL, which would let every category sample re-insert on
+    each import.
+    """
+    conn.executemany(
+        """
+        INSERT INTO samples (metric_id, source_id, device_id, value, category, start_at, end_at)
+        SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
+        WHERE NOT EXISTS (
+            SELECT 1 FROM samples
+            WHERE metric_id = ?1 AND start_at = ?6 AND end_at = ?7
+              AND source_id = ?2 AND value IS ?4 AND category IS ?5
+        )
+        """,
+        [(metric_id[r[0]], source_id[r[1]], device_id.get(r[2]), r[3], r[4], r[5], r[6])
+         for r in rows])
+    conn.commit()
+
+
 def build_schema(conn):
     conn.executescript("""
     PRAGMA journal_mode = WAL;
@@ -314,6 +360,13 @@ def build_schema(conn):
     );
     CREATE INDEX IF NOT EXISTS idx_samples_metric_start ON samples (metric_id, start_at);
 
+    -- NOTE on idempotency: there is deliberately NO unique index over the
+    -- identity columns. Measured on the reference export it cost 21.9 MB --
+    -- as much as the samples table itself (21.7 MB) -- to enforce something
+    -- the import can check for free by probing idx_samples_metric_start.
+    -- See insert_samples(): each candidate row is inserted behind a NOT EXISTS
+    -- guard that narrows through that index to a handful of rows.
+
     -- One row per (day, metric). This is what the dashboard reads.
     CREATE TABLE IF NOT EXISTS daily_metrics (
         day          TEXT NOT NULL,
@@ -356,18 +409,22 @@ def build_schema(conn):
     """)
 
 
-def run(export_dir, out_path):
+def run(export_dir, out_path, append=False):
     xml_path = os.path.join(export_dir, "export.xml")
     if not os.path.exists(xml_path):
         sys.exit(f"no export.xml under {export_dir}")
 
     print(f"reading {xml_path} ({os.path.getsize(xml_path) / 1e6:.0f} MB)")
 
-    # day -> identifier -> list of samples
-    by_day = defaultdict(lambda: defaultdict(list))
-    sleep_samples = []
+    # Deduplicate identical records BEFORE rolling up, not just at insert time.
+    # Otherwise the stored sample count and the rollup's sample_count disagree
+    # the moment an export repeats a record -- and the two must always describe
+    # the same set, because the Swift store builds its rollups from what it
+    # stored.
+    seen = set()
+    samples = []
     issues = defaultdict(int)
-    rows = []
+    duplicates = 0
     n = 0
 
     for identifier, attrs in iter_records(xml_path):
@@ -380,23 +437,37 @@ def run(export_dir, out_path):
             issues[f"unit_mismatch:{ident}:got={got}:want={want}"] += 1
             continue
 
+        key = (s["identifier"], s["source"], s["start"], s["end"], s["value"], s["category"])
+        if key in seen:
+            duplicates += 1
+            continue
+        seen.add(key)
+        samples.append(s)
+
         n += 1
+        if n % 100_000 == 0:
+            print(f"  {n:,} samples")
+
+    # day -> identifier -> list of samples
+    by_day = defaultdict(lambda: defaultdict(list))
+    sleep_samples = []
+    rows = []
+
+    for s in samples:
         rows.append((
             s["identifier"], s["source"], s["device"], s["value"], s["category"],
             int(s["start"].timestamp()), int(s["end"].timestamp()),
         ))
-
         if s["identifier"] == "SleepAnalysis":
             sleep_samples.append(s)
         else:
             by_day[s["start"].date().isoformat()][s["identifier"]].append(s)
 
-        if n % 100_000 == 0:
-            print(f"  {n:,} samples")
-
+    if duplicates:
+        print(f"ignored {duplicates:,} duplicate records")
     print(f"parsed {n:,} usable samples")
 
-    if os.path.exists(out_path):
+    if os.path.exists(out_path) and not append:
         os.remove(out_path)
     conn = sqlite3.connect(out_path)
     build_schema(conn)
@@ -416,14 +487,12 @@ def run(export_dir, out_path):
     source_id = dict(conn.execute("SELECT name, id FROM sources"))
     device_id = dict(conn.execute("SELECT descriptor, id FROM devices"))
 
-    conn.executemany(
-        "INSERT INTO samples (metric_id,source_id,device_id,value,category,start_at,end_at) "
-        "VALUES (?,?,?,?,?,?,?)",
-        [(metric_id[r[0]], source_id[r[1]], device_id.get(r[2]), r[3], r[4], r[5], r[6])
-         for r in rows])
-    conn.commit()
-    print(f"stored {conn.execute('SELECT COUNT(*) FROM samples').fetchone()[0]:,} samples "
-          f"across {len(source_id)} sources and {len(device_id)} devices")
+    insert_samples(conn, rows, metric_id, source_id, device_id)
+
+    stored = conn.execute('SELECT COUNT(*) FROM samples').fetchone()[0]
+    print(f"stored {stored:,} samples across {len(source_id)} sources "
+          f"and {len(device_id)} devices"
+          + (f" ({len(rows) - stored:,} duplicates ignored)" if len(rows) != stored else ""))
 
     # ---- daily rollups -----------------------------------------------------
     daily = []
@@ -553,5 +622,9 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("export_dir", help="the unzipped apple_health_export directory")
     ap.add_argument("--out", default="aura.sqlite")
+    ap.add_argument("--append", action="store_true",
+                    help="import into an existing database instead of rebuilding it. "
+                         "Re-importing the same export must be a no-op -- that is the "
+                         "idempotency contract the Swift store has to meet too.")
     a = ap.parse_args()
-    run(a.export_dir, a.out)
+    run(a.export_dir, a.out, append=a.append)

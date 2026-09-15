@@ -66,10 +66,32 @@ Adding a metric is one line in `MetricCatalog`. Nothing else needs to know.
 ## Idempotent import
 
 Every Apple Health export contains **all** history, so the second import is
-~99% duplicates. That's the normal case, not an error. Re-importing must be a
-cheap no-op for existing samples and must not create a duplicate row, a
-double-counted day, or a corrupted rollup. Rollups are rebuilt only for the
-affected day range.
+~99% records already stored. That is the normal case, not an error. Re-importing
+must be a cheap no-op and must never create a duplicate row, a double-counted
+day, or a corrupted rollup. Rollups are rebuilt only for the affected day range.
+
+Two levels, because there are two kinds of duplicate:
+
+**Within one file** — the reference export contains 118 byte-identical records.
+These are filtered on identity before rollup, so the stored sample count and the
+rollups always describe the same set.
+
+**Across imports** — enforced by an existence probe at insert time, not by a
+unique index. That choice was measured rather than assumed: a `UNIQUE` index
+over the identity columns cost **21.9 MB on the reference dataset — as much as
+the samples table itself (21.7 MB)**, to enforce something the existing
+`(metric_id, start_at)` index can already check. The probe narrows through that
+index to a handful of rows before comparing the rest, so idempotency costs an
+indexed lookup per candidate row during import and **nothing at all in stored
+bytes**.
+
+One subtlety the Swift port must preserve: the comparison uses `IS`, not `=`,
+on `value` and `category`. Both are nullable, and `=` never matches `NULL` —
+with `=`, every category sample (all sleep, all stand hours) would re-insert on
+every import.
+
+`tools/conformance.py` asserts this by importing the fixture twice and checking
+that every table is unchanged.
 
 ## Measured performance
 

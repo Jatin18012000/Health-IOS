@@ -45,11 +45,46 @@ Category records (sleep, stand hours, events) carry a string `value` such as
 `<HeartRateVariabilityMetadataList>` children with instantaneous BPM readings.
 Currently unused, but they are the reason a record can span multiple lines.
 
+## Entity encoding — decode it or the dedup inverts
+
+Attribute values are XML, and Apple uses entities in them:
+
+```
+device="&lt;&lt;HKDevice: 0x...&gt;, name:Apple Watch, ...&gt;"
+```
+
+A parser that reads attribute values raw rather than decoding them stores
+`&lt;` literally — cosmetic for `device`, but **fatal for `sourceName`**. A
+source name containing `&`, or a non-breaking space written as `&#160;`, will
+not match the trust-order patterns, so the most trustworthy device silently
+ranks as "unknown" and **loses every overlap it should win**. The deduplicated
+totals come out wrong with no error anywhere.
+
+This is not hypothetical: it is the first bug the edge-case fixture caught
+(`Tests/Fixtures/edge-cases`). The reference export happens to write a literal
+U+00A0 byte in the Watch's name rather than `&#160;`, so the real data hid it.
+
+Swift's `XMLParser` decodes entities itself, so the shipping importer gets this
+for free — which is precisely why the fixture encodes the name as `&#160;`, to
+keep the check meaningful on both sides.
+
+## Duplicate records
+
+The reference export contains **118 byte-identical duplicate records** — same
+type, source, start, end and value. Almost all are `StepCount`, 
+`HeadphoneAudioExposure` and `DistanceWalkingRunning` from the iPhone.
+
+They are not an error and they are not rare enough to ignore: summing them
+double-counts those samples. Deduplication happens on identity before rollup,
+so 664,515 records in the file become **664,397 stored samples**.
+
 ## Volume
 
 | | |
 |---|---|
-| Records | **664,515** |
+| Records in file | **664,515** |
+| Byte-identical duplicates | 118 |
+| Unique samples stored | **664,397** |
 | Distinct metric types | 40 |
 | Date range | 2022-09-27 → 2026-09-15 |
 | Distinct days with data | **1,450** |
