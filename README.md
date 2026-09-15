@@ -26,6 +26,7 @@ storage, local language model, local speech. Nothing leaves the laptop.
   arithmetic.
 - [`docs/VOICE.md`](docs/VOICE.md) — the latency budget for conversation.
 - [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — schema and measured performance.
+- [`docs/COST.md`](docs/COST.md) — why this runs at zero cost, and the one thing that isn't free.
 
 ## Try the pipeline now
 

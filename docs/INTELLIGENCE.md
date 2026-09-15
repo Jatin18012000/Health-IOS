@@ -24,18 +24,69 @@ computed in Swift and passed in.** She is never asked to derive one.
 This is also why she's fast. A brief is a few hundred tokens, so the first token
 arrives in well under a second instead of after a multi-thousand-token prompt.
 
-## Model
+## Model choice
 
-Default: **MLX**, weights loaded in-process. One app, one process, no daemon,
-fully offline. An 8B-class model at 4-bit runs at conversational speed on an M5;
-measure on your machine and pick the largest that keeps first-token latency
-under ~0.5 s, since that is what the conversation budget allows
-(`VERDICT.md` §4).
+Two models, not one. They do different jobs and the reasons to pick them are
+different — trying to serve both with a single model is what produces either a
+companion that sounds robotic or one that quietly invents figures.
 
-Alternative: **Ollama** over local HTTP, for trying models without touching the
-app.
+### The extractor — Apple Foundation Models (~3B, built into macOS 26)
 
-There is deliberately no hosted-API conformer in the default build.
+Used for everything structured: routing a question to the right analysis,
+pulling entities out of what you said, classifying an annotation, deciding which
+metrics a brief needs.
+
+It is the right tool for this specifically because of **guided generation**. You
+annotate a Swift type with `@Generable`, and the framework uses *constrained
+decoding* to guarantee the output matches that schema — malformed output is not
+unlikely, it is structurally impossible. There is no JSON parsing, no retry
+loop, no "the model returned prose again" failure mode. You get a typed Swift
+value or an error.
+
+It costs nothing, downloads nothing, and is already on the machine. For a
+3B model it is weak at open-ended prose, which is why it does not do that job.
+
+### The narrator — Qwen3.x via MLX
+
+Used for the writing: turning a `HealthBrief` into something warm and specific,
+and holding a conversation. Apache 2.0, so no licence entanglement.
+
+Size depends on unified memory — a 4-bit 27B-class model needs ~16–19 GB
+resident, and macOS gives the GPU only about two-thirds to three-quarters of
+unified memory, so a model that "fits in 17 GB" needs meaningfully more machine
+than that:
+
+| Unified memory | Practical choice | Notes |
+|---|---|---|
+| 16 GB | Qwen3.x 8B, 4-bit | Comfortable; leaves room for the app and the TTS model |
+| 24 GB | Qwen3.x 14B, 4-bit | Best quality-per-constraint at this tier |
+| 32 GB+ | Qwen3.8-27B class, 4-bit | ~18 GB download; 32 GB is the practical floor |
+
+MLX is the right runtime on Apple Silicon — measurably faster than the
+alternatives for models under ~14B, and it loads weights in-process so there is
+no daemon to manage. An `OllamaModel` conformer stays useful for trying a
+different model without touching the app.
+
+Do not pick the largest model that technically loads. First-token latency is
+what makes her feel present (`docs/VOICE.md`), and a model that swaps to disk
+misses the budget entirely.
+
+## Why hallucination is mostly an architecture problem here
+
+The instinct is to pick the model that hallucinates least. That matters, but it
+is the smaller lever. Three structural choices do more:
+
+1. **She is never asked to do arithmetic.** Every figure is computed in Swift
+   and passed in. The most common way a health assistant lies is getting a
+   number wrong, and that failure mode is designed out rather than mitigated.
+2. **Structured output is constrained, not requested.** Guided generation makes
+   schema violations impossible instead of unlikely.
+3. **`OutputGuard` cross-checks every numeral** in the generated text against
+   the brief. A figure that was not passed in cannot reach you.
+
+What remains is ordinary prose unreliability — hedging, tone, over-confidence —
+which is what model quality actually buys, and why the narrator tier is worth
+spending memory on.
 
 ## Brief construction
 
