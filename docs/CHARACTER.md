@@ -33,7 +33,7 @@ impact per hour of work:
 5. **Entrances and exits.** She should arrive when the app opens and settle when
    idle, not simply exist. Transitions are what make a figure inhabit a space.
 
-## Version one: sprites
+## The sprite placeholder (M4)
 
 The five states in the design mockups — idle · stretch · cheer · focus ·
 good night — cross-faded, with procedural motion layered on top:
@@ -48,23 +48,123 @@ That combination is convincing enough to ship, and it works with the artwork you
 already have. Budget: keep the whole stage under ~2 ms per frame so it never
 competes with the LLM for the GPU.
 
-## Version two: Live2D
+## Decision: Live2D, not 3D
 
-The real thing — hair and ponytail physics, genuine eye tracking, mouth shapes
-rather than frames, breathing built into the rig. This is what the reference
-images imply and what will make her feel alive rather than animated.
+**Decided.** Live2D (or Inochi2D) is the target. 3D in Blender was evaluated and
+rejected. Recording the reasoning here so it does not get re-litigated.
 
-The Cubism SDK for Native renders via Metal and embeds into SwiftUI through
-`NSViewRepresentable`. The code side is a new `CharacterRenderer` conformer and
-nothing else — that's the entire point of the protocol.
+### The decisive reason
 
-**The cost is art, not code.** A Live2D model needs the illustration separated
-into roughly 40 PSD layers (each eye, eyelid, pupil, mouth shape, hair strand
-group, arm segment) and rigged with deformers in Cubism. Either commissioned —
-typically a few hundred dollars for a model of this complexity — or a serious
-solo project. This is the one part of the build that money solves faster than
-effort, and it should be started early because it runs in parallel with
-everything else.
+A 3D model built *from* the reference illustrations will not look like the
+reference illustrations. It will look like a new character who resembles them.
+Live2D uses the actual artwork — the real pixels — and makes it move. If the goal
+is *that* character on the dashboard, 3D is the one approach that guarantees she
+doesn't arrive.
+
+### The supporting reasons
+
+**Anime in 3D is among the hardest things in 3D.** The 2D anime look depends on
+cheating that 3D cannot do natively: eyes painted flat on a curved face, hair
+that reads as shapes rather than volumes, faces drawn differently per angle. A
+geometrically honest 3D anime face looks wrong at three-quarter angles.
+
+Guilty Gear Xrd is the reference point, and how they did it is the tell: the team
+deliberately abandoned mathematical accuracy, hand-adjusted facial geometry and
+hair per camera angle, and edited vertex normals by hand. That is a studio with a
+full art team *fighting* the 3D pipeline to recover the 2D look. Doing that solo,
+as a side quest on a health app, is not a realistic plan.
+
+**Apple's renderer is pointed the other way.** SceneKit is deprecated; RealityKit
+is the supported path, and RealityKit is built for photorealistic AR. Cel shading
+with outlines means custom ShaderGraphMaterial work and inverted-hull tricks in a
+framework designed to do the opposite. Custom vertex normals — the exact thing
+the anime look depends on — also frequently fail to survive glTF export cleanly.
+
+**The cost is misallocated.** 3D buys arbitrary camera angles, full-body motion,
+dynamic lighting and AR reuse. This dashboard shows her from one angle, in a
+fixed pose, talking. That is precisely what Live2D was invented for. Paying the
+full cost of 3D for capabilities the app never uses is the wrong trade.
+
+**Time.** For someone who is not already a rigging-capable 3D character artist,
+the chain — model, UV, texture, rig, weight paint, blendshapes, toon shader,
+outline pass, export, real-time renderer — is realistically 3 to 6 months. That
+is longer than the entire health app.
+
+### The one condition that would change this
+
+If you are already comfortable rigging and weight-painting in Blender, the time
+estimate is wrong and 3D becomes defensible. It was rejected on the assumption
+that you are not. If that assumption is wrong, reopen it.
+
+## Getting the rig made
+
+This is the long-lead item on the whole project. **Start it at M0, in parallel
+with everything else** — it is the only piece that cannot be compressed later by
+working harder.
+
+### The part people underestimate
+
+You cannot just split the reference PNG into layers. **Everything currently
+hidden has to be drawn from scratch** — the face behind the hair, the torso
+behind the arms, the jaw behind the jawline. A flat illustration contains no
+information about what is underneath, and a rig needs all of it, because every
+one of those parts moves independently.
+
+That is why this is real art labour rather than a Photoshop afternoon, and why
+"I already have the image" does not mean the hard part is done.
+
+### What a rig needs
+
+Roughly 30–60 separated layers:
+
+- **Face** — eyebrows (L/R), eye whites, irises, highlights, upper and lower
+  eyelids, eyelashes, mouth shapes, nose, blush
+- **Hair** — front, side, back, and the ponytail split into strand groups so
+  physics can act on them independently
+- **Body** — torso, upper and lower arms, hands
+- **Clothing and accessories** — jacket, crop top, headphones, earrings
+
+Then rigged with the standard Cubism parameters: `ParamAngleX/Y/Z`,
+`ParamEyeLOpen`/`ParamEyeROpen`, `ParamEyeBallX/Y`, `ParamBrowLY/RY`,
+`ParamMouthOpenY`, `ParamMouthForm`, `ParamBodyAngleX/Y/Z`, `ParamBreath`, plus
+physics groups for hair and ponytail.
+
+### Two routes
+
+**Commission it.** An artist separates the layers, paints the occluded regions
+and rigs it in Cubism. Typically a few hundred pounds for a model of this
+complexity, and they use their own editor licence, so Cubism's free-vs-PRO tier
+limits stop being your problem.
+
+**Do it yourself.** Free, and a genuine art project. Inochi Creator is fully open
+source with no revenue threshold at all; Cubism Editor's free tier has feature
+limits worth checking against your rig's complexity before you start.
+
+### The integration work
+
+The Cubism SDK for Native is **C++**, rendering through Metal. There is no
+official Swift wrapper, so integration means a small Objective-C++ bridge behind
+an `NSViewRepresentable` wrapping an `MTKView`. Bounded and well-trodden, but not
+zero — budget for it rather than discovering it.
+
+Inochi2D's runtime is a separate integration with its own trade-offs; evaluate
+whichever you pick before committing the artwork to its format.
+
+### Why the sprite stage still happens first
+
+Live2D is the destination, not the starting line. The sprite renderer ships at M4
+as a **placeholder that keeps the app unblocked while the rig is being made** —
+it is not a competing option and not wasted work.
+
+Two reasons it earns its place:
+
+1. **Artwork is the long pole.** Whether commissioned or self-made, the rig will
+   not exist at M4. Without sprites the entire character track blocks on it.
+2. **It de-risks the seam.** The sprite renderer drives the mouth from the audio
+   amplitude stream. Live2D drives `ParamMouthOpenY` from *the same* amplitude
+   stream. Getting that pipeline — TTS → level → mouth — working against cheap
+   assets means that when the rig arrives, it is a new `CharacterRenderer`
+   conformer and a manifest change, with the hard part already proven.
 
 ## Asset layout
 

@@ -3,10 +3,15 @@
 Ordered so that something works end-to-end early and each milestone is
 independently useful. Estimates assume solo, evenings and weekends.
 
-A note on sequencing: **the character artwork should be commissioned or started
-at M0**, not at M4. It is the longest-lead item and the only one that can't be
-compressed by working harder on it — everything else can proceed in parallel
-while it's in progress.
+A note on sequencing: **the Live2D rig is a parallel track that starts now, at
+M0** — not at M9. It is the longest-lead item on the project and the only one
+that cannot be compressed later by working harder, because it is art labour
+rather than engineering. Whether commissioned or self-made, it needs to be in
+progress while the software milestones proceed.
+
+Live2D is the decided destination (`docs/CHARACTER.md`); 3D was evaluated and
+rejected. The sprite renderer at M4 is a placeholder that keeps the character
+track unblocked until the rig exists, not a competing approach.
 
 ---
 
@@ -87,13 +92,18 @@ while it's in progress.
 - Encrypted backup
 - Golden tests pinned against the real export
 
-### M9 — Live2D · gated on artwork
+### M9 — Live2D · when the rig lands
 
-- Cubism SDK integration behind `CharacterRenderer`
-- Viseme-based lipsync replacing mouth frames
-- Hair and ponytail physics, real eye tracking
-- **Done when** the renderer swap is a manifest change and no dashboard code
-  moved.
+Slots in whenever the artwork is ready, not at a fixed point in the sequence.
+
+- Objective-C++ bridge over the Cubism Native SDK (it is C++, with no official
+  Swift wrapper), behind an `NSViewRepresentable` wrapping an `MTKView`
+- A `Live2DRenderer` conforming to `CharacterRenderer`
+- `ParamMouthOpenY` driven by the same audio amplitude stream the sprite
+  renderer already uses — the pipeline is proven by then, only the consumer
+  changes
+- Hair and ponytail physics, real eye tracking via `ParamEyeBallX/Y`
+- **Done when** the swap is a manifest change and no dashboard code moved.
 
 ### Later — iOS companion
 
@@ -110,4 +120,4 @@ Developer account to stay installed.
 | Usable dashboard, real data | ~5 weeks |
 | She's on screen and animated | ~8 weeks |
 | She talks, listens, remembers | ~12 weeks |
-| Live2D | + artwork lead time |
+| Live2D | whenever the rig lands — commission it now |
