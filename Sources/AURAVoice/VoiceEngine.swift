@@ -33,12 +33,66 @@ public protocol VoiceEngine: AnyObject, Sendable {
 
 /// Speech-to-text, so she can be talked to rather than only typed at.
 ///
-/// Planned conformer is WhisperKit -- Whisper compiled to Core ML, running on
-/// the Neural Engine. Fully on-device: no audio leaves the machine.
+/// WhisperKit — Whisper compiled to Core ML, running on the Neural Engine.
+/// Fully on-device; no audio leaves the machine.
+///
+/// ## Why this reports a level rather than partial text
+///
+/// The protocol originally promised `onPartial: (String) -> Void`, streaming
+/// interim transcriptions as you spoke. WhisperKit's open-source surface does
+/// not do that: true low-latency streaming lives in Argmax's paid tier, and the
+/// free package transcribes a **complete** buffer. Faking partials by
+/// re-transcribing a growing buffer several times a second would burn the
+/// Neural Engine the language model needs and still be wrong until you stopped.
+///
+/// So the contract says what is actually true: while you hold the key, the
+/// engine reports how loudly it is hearing you — enough for the UI to show it
+/// is listening — and the text arrives when you let go. For push-to-talk, which
+/// is what `docs/VOICE.md` specifies, that is the whole interaction anyway.
 public protocol TranscriptionEngine: AnyObject, Sendable {
-    func startListening(onPartial: @escaping @Sendable (String) -> Void) async throws
+    /// Begin recording. `onLevel` fires at display rate with a 0...1 amplitude
+    /// so the UI can show it is hearing you.
+    func startListening(onLevel: @escaping @Sendable (Double) -> Void) async throws
+
+    /// Stop recording and transcribe what was captured.
     func stopListening() async throws -> String
+
+    /// Abandon a recording without transcribing it.
+    func cancelListening()
+
+    /// Load the model ahead of first use. Default no-op.
+    ///
+    /// On the protocol rather than the conformer so the app never has to
+    /// downcast to find out whether warming up is possible.
+    func prepare() async throws
+
     var isListening: Bool { get }
+}
+
+public extension TranscriptionEngine {
+    func prepare() async throws {}
+}
+
+/// Builds the engines available in this build.
+///
+/// The `canImport` checks belong here, in the module that actually depends on
+/// WhisperKit — the app target links `AURAVoice`, not WhisperKit, so the same
+/// conditional written up there is always false.
+public enum VoiceFactory {
+
+    public static func speech() -> any VoiceEngine {
+        SystemVoice()
+    }
+
+    public static func transcription() -> any TranscriptionEngine {
+        #if canImport(WhisperKit)
+        return WhisperTranscriber()
+        #else
+        return UnavailableTranscriber(
+            reason: "Speech recognition is not available in this build, so talking to her "
+                  + "is off. Typing works normally.")
+        #endif
+    }
 }
 
 public enum VoiceError: Error, Sendable {

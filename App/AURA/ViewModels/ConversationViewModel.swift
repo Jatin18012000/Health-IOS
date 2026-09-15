@@ -45,21 +45,31 @@ public final class ConversationViewModel {
     /// looking like her trailing off.
     public private(set) var withheldCount = 0
 
+    /// True while the talk key is held.
+    public private(set) var isListening = false
+    /// 0...1 from the microphone, so the UI can show it is hearing you.
+    public private(set) var inputLevel: Double = 0
+    /// Set when speech input fails — a denied microphone, a missing model.
+    public private(set) var listeningError: String?
+
     public var draft = ""
 
     // MARK: Dependencies
 
     private let conversation: Conversation
     private let voice: any VoiceEngine
+    private let transcriber: any TranscriptionEngine
     private let day: CalendarDay
     private var task: Task<Void, Never>?
 
     public init(model: any LanguageModel,
                 briefBuilder: BriefBuilder,
                 voice: any VoiceEngine,
+                transcriber: any TranscriptionEngine,
                 day: CalendarDay) {
         self.conversation = Conversation(model: model, briefBuilder: briefBuilder)
         self.voice = voice
+        self.transcriber = transcriber
         self.day = day
         if !model.isReady, let unavailable = model as? UnavailableModel {
             self.status = .unavailable(unavailable.reason)
@@ -89,6 +99,71 @@ public final class ConversationViewModel {
                 }
             }
         }
+    }
+
+    // MARK: Push-to-talk
+
+    /// Called when the talk key goes down.
+    ///
+    /// Interrupting her first is the barge-in: pressing the key to speak is an
+    /// unambiguous signal that you want her to stop, and it needs no acoustics.
+    /// Detecting interruption from the microphone alone would mean hearing past
+    /// her own voice through the speakers, which is an echo-cancellation
+    /// project, not a feature.
+    public func startTalking() {
+        guard !isListening else { return }
+        if isBusy { interrupt() }
+        listeningError = nil
+
+        Task { [transcriber] in
+            do {
+                try await transcriber.startListening { level in
+                    Task { @MainActor [weak self] in self?.inputLevel = level }
+                }
+                await MainActor.run { [weak self] in
+                    self?.isListening = true
+                    self?.characterState = .listening
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.listeningError = error.localizedDescription
+                    self?.isListening = false
+                    self?.characterState = .idle
+                }
+            }
+        }
+    }
+
+    /// Called when the talk key comes up: transcribe and ask.
+    public func stopTalking() {
+        guard isListening else { return }
+        isListening = false
+        inputLevel = 0
+        characterState = .thinking
+
+        Task { [transcriber] in
+            let text = (try? await transcriber.stopListening()) ?? ""
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                let question = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !question.isEmpty else {
+                    // A held key with nothing said is not an error, and not a
+                    // question either. Say nothing and go back to idle.
+                    self.characterState = .idle
+                    return
+                }
+                self.ask(question)
+            }
+        }
+    }
+
+    /// Abandon a recording without asking anything.
+    public func cancelTalking() {
+        guard isListening else { return }
+        transcriber.cancelListening()
+        isListening = false
+        inputLevel = 0
+        characterState = .idle
     }
 
     /// Stop her immediately.

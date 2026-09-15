@@ -93,6 +93,7 @@ struct RootView: View {
                     model: container.languageModel,
                     briefBuilder: BriefBuilder(store: store),
                     voice: container.voice,
+                    transcriber: container.transcriber,
                     day: container.latestDay ?? CalendarDay(Date())))
             }
         }
@@ -184,16 +185,9 @@ final class AppContainer {
     /// `@ObservationIgnored` because they are dependencies, not UI state — and
     /// because `lazy` does not survive the `@Observable` macro's rewrite of
     /// stored properties.
-    @ObservationIgnored let voice: any VoiceEngine = SystemVoice()
-    @ObservationIgnored let languageModel: any LanguageModel = {
-        #if canImport(MLXLLM)
-        MLXModel()
-        #else
-        UnavailableModel(
-            reason: "MLX is not available in this build, so the companion is offline. "
-                  + "The dashboard works normally.")
-        #endif
-    }()
+    @ObservationIgnored let voice: any VoiceEngine = VoiceFactory.speech()
+    @ObservationIgnored let transcriber: any TranscriptionEngine = VoiceFactory.transcription()
+    @ObservationIgnored let languageModel: any LanguageModel = ModelFactory.local()
 
     /// Mirrors the model's readiness as observable state.
     ///
@@ -226,6 +220,11 @@ final class AppContainer {
                 try? await languageModel.warmUp()
                 await MainActor.run { self?.isModelReady = languageModel.isReady }
             }
+
+            // Whisper's weights download on first use. Fetching them now means
+            // the first thing you say is not also the thing that waits for a
+            // download.
+            Task { [transcriber] in try? await transcriber.prepare() }
         } catch {
             status = .failed(error.localizedDescription)
         }

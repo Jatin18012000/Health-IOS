@@ -11,8 +11,13 @@ One-time setup, once you're on the Mac:
 2. File → Add Package Dependencies → Add Local → choose the repository root.
 3. Link `AURACore`, `AURAStore`, `AURAAnalytics`, `AURAIntelligence`,
    `AURAVoice`, `AURACharacter`, `AURADesign`.
-4. Signing & Capabilities → App Sandbox → enable **Audio Input** (M6) and
+4. Signing & Capabilities → App Sandbox → enable **Audio Input** and
    **User Selected File** read access (so the import can read the export).
+5. Add **`NSMicrophoneUsageDescription`** to Info.plist. Without it the app
+   does not prompt for the microphone — it crashes the moment the audio engine
+   starts, which looks like a bug in the talk button rather than a missing key.
+   Something like: *"AURA transcribes what you say on this device. No audio
+   leaves your Mac."*
 
 Everything below the shell stays in `Sources/` so it can be built and tested
 from the command line with `swift build` / `swift test`, and so the future iOS

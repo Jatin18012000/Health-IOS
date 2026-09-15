@@ -120,15 +120,18 @@ of which would have been expensive to find later:
 - **Done when** she answers "how has my sleep been this year?" correctly, and
   every figure she states can be traced to a computed value.
 
-### M6 — She speaks and listens · voice engine written
+### M6 — She speaks and listens · written, not yet compiled
 
 - ~~`SystemVoice` with the amplitude stream driving her mouth~~ **written**,
   rendering to buffers and tapping the playing node so levels are emitted in
   step with what is audible rather than as the synthesiser renders ahead
-- WhisperKit push-to-talk
-- Interruption handling
-- **Done when** you can hold a spoken conversation and she stops the moment you
-  start talking.
+- ~~WhisperKit push-to-talk~~ **written** — hold to talk, release to send, with
+  microphone resampling and a silence floor
+- ~~Interruption handling~~ **written** — pressing the talk key cancels
+  generation and cuts audio together
+- **Remaining:** `swift build`, the microphone entitlement and usage string
+  (`App/README.md`), and a real conversation to find out whether the end-to-end
+  latency is what the budget assumes.
 
 ### M7 — She remembers · ~1–2 weeks
 

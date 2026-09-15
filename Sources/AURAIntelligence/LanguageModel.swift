@@ -43,3 +43,21 @@ public enum ModelError: Error, Sendable {
     case weightsMissing(String)
     case contextOverflow(tokens: Int, limit: Int)
 }
+
+
+/// Builds the language model available in this build.
+///
+/// The `canImport(MLXLLM)` check belongs here for the same reason the Whisper
+/// one belongs in `AURAVoice`: the app target links this module, not MLX, so
+/// the conditional only has the right answer on this side of the boundary.
+public enum ModelFactory {
+    public static func local() -> any LanguageModel {
+        #if canImport(MLXLLM)
+        return MLXModel()
+        #else
+        return UnavailableModel(
+            reason: "MLX is not available in this build, so the companion is offline. "
+                  + "The dashboard works normally.")
+        #endif
+    }
+}

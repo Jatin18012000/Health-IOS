@@ -36,8 +36,10 @@ let package = Package(
         // factory call changed shape with it.
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "2.21.0"),
 
-        // M6 (speech-to-text), uncommented when Whisper lands:
-        // .package(url: "https://github.com/argmaxinc/WhisperKit", from: "0.9.0"),
+        // Speech-to-text. MIT-licensed; the push-to-talk path uses only the
+        // open-source surface. (Argmax's paid tier buys low-latency STREAMING
+        // transcription, which push-to-talk does not need.)
+        .package(url: "https://github.com/argmaxinc/WhisperKit", from: "0.9.0"),
     ],
     targets: [
         // Domain vocabulary. Depends on nothing. Everything depends on it.
@@ -71,7 +73,13 @@ let package = Package(
 
         // Text-to-speech, speech-to-text, and the audio level tap that drives
         // her mouth. Protocol-first so the engine can be swapped.
-        .target(name: "AURAVoice", dependencies: ["AURACore"]),
+        //
+        // WhisperKit sits behind `#if canImport`, so the module builds and the
+        // app runs with typing as the only input when it is absent.
+        .target(name: "AURAVoice", dependencies: [
+            "AURACore",
+            .product(name: "WhisperKit", package: "WhisperKit"),
+        ]),
 
         // The companion: mood state machine, sprite renderer, Live2D seam.
         .target(name: "AURACharacter", dependencies: ["AURACore", "AURADesign"]),

@@ -3,6 +3,7 @@ import AURACore
 import AURADesign
 import AURACharacter
 import AURAIntelligence
+import AURAVoice
 
 /// The companion screen: her on the left, the conversation on the right.
 ///
@@ -40,7 +41,9 @@ public struct ConversationView: View {
             .overlay(alignment: .top) {
                 HStack {
                     Spacer()
-                    if case .speaking = model.characterState {
+                    if model.isListening {
+                        statusChip("Listening", tint: theme.accent)
+                    } else if case .speaking = model.characterState {
                         statusChip("Speaking", tint: theme.dataSeries[3])
                     } else if model.status == .thinking {
                         statusChip("Thinking", tint: theme.secondary)
@@ -107,6 +110,17 @@ public struct ConversationView: View {
         .padding(.vertical, 22)
     }
 
+    private func notice(_ text: String, tint: Color) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: "exclamationmark.circle").foregroundStyle(tint)
+            Text(text)
+                .font(.system(size: 11.5))
+                .foregroundStyle(theme.textSecondary)
+            Spacer()
+        }
+        .padding(.horizontal, 30).padding(.vertical, 14)
+    }
+
     private func capsule(_ text: String, tint: Color) -> some View {
         Text(text)
             .font(.system(size: 10.5))
@@ -170,19 +184,24 @@ public struct ConversationView: View {
         VStack(spacing: 0) {
             Divider().overlay(theme.surfaceStroke)
 
+            if let error = model.listeningError {
+                notice(error, tint: theme.dataSeries[4])
+            }
+
             if case .unavailable(let reason) = model.status {
-                HStack(spacing: 9) {
-                    Image(systemName: "exclamationmark.circle")
-                        .foregroundStyle(theme.dataSeries[4])
-                    Text(reason)
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(theme.textSecondary)
-                    Spacer()
-                }
-                .padding(.horizontal, 30).padding(.vertical, 14)
+                notice(reason, tint: theme.dataSeries[4])
             }
 
             HStack(spacing: 12) {
+                TalkButton(isListening: model.isListening, level: model.inputLevel)
+                    // Hold to talk, release to send. A press-and-hold gesture
+                    // rather than a toggle, because the key being down IS the
+                    // recording — there is no state to get out of sync.
+                    .onLongPressGesture(minimumDuration: 0.01, maximumDistance: .infinity) {
+                    } onPressingChanged: { pressing in
+                        pressing ? model.startTalking() : model.stopTalking()
+                    }
+
                 TextField("Ask her something…", text: $model.draft, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
@@ -221,6 +240,39 @@ public struct ConversationView: View {
             .padding(.horizontal, 30)
             .padding(.vertical, 18)
         }
+    }
+}
+
+/// Hold to talk. Shows what it is hearing while held.
+private struct TalkButton: View {
+    @Environment(\.theme) private var theme
+    let isListening: Bool
+    let level: Double
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(isListening ? theme.accent.opacity(0.18) : Color.clear)
+                .strokeBorder(isListening ? theme.accent : theme.surfaceStroke)
+                .frame(width: 32, height: 32)
+
+            // The ring grows with what the microphone hears. Without it a held
+            // key is indistinguishable from a dead microphone until you let go
+            // and nothing happens.
+            if isListening {
+                Circle()
+                    .strokeBorder(theme.accent.opacity(0.4), lineWidth: 2)
+                    .frame(width: 32 + level * 16, height: 32 + level * 16)
+                    .animation(.linear(duration: 0.08), value: level)
+            }
+
+            Image(systemName: "mic")
+                .font(.system(size: 12))
+                .foregroundStyle(isListening ? theme.accent : theme.textSecondary)
+        }
+        .frame(width: 50, height: 50)
+        .contentShape(Circle())
+        .help("Hold to talk")
     }
 }
 

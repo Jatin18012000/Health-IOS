@@ -44,17 +44,51 @@ Any TTS conformer that cannot provide it is not usable.
 ## Speech to text
 
 **WhisperKit** — Whisper compiled to Core ML, running on the Neural Engine.
-Fully on-device; no audio leaves the machine. Partial results stream so the UI
-can show words appearing as you speak, which makes the wait feel shorter than it
-is.
+MIT-licensed, fully on-device; no audio leaves the machine.
+
+**No streaming partials, and the protocol says so.** An earlier draft here
+promised interim text appearing as you speak. WhisperKit's open-source surface
+does not do that — low-latency streaming transcription is in Argmax's paid tier,
+and the free package transcribes a complete buffer. Faking partials by
+re-transcribing a growing buffer several times a second would burn the Neural
+Engine the language model needs, and still be wrong until you stopped talking.
+
+So `TranscriptionEngine` reports an **audio level** while you hold the key, and
+the text arrives when you let go. For push-to-talk that is the whole interaction
+anyway.
+
+**`base.en`, not `large-v3`.** A push-to-talk utterance is a few seconds of
+clear, close-mic speech in one known language — the easiest case there is.
+`base.en` handles it in a fraction of the time and ~150 MB instead of ~1.5 GB,
+and that memory is contested: the language model, the TTS voice and the app are
+all resident at once during a spoken exchange.
 
 **Push-to-talk before wake-word.** A hotkey is a day's work and always correct.
 An always-listening wake word is weeks of work, will misfire, and means a hot
 microphone in your home. Start with the hotkey; revisit only if you find
 yourself wanting it.
 
+Two details that matter in practice:
+
+- **The microphone will not be 16 kHz mono.** The input node hands back the
+  hardware's format, usually 44.1 or 48 kHz and often stereo. Feeding that to
+  Whisper unconverted does not fail — it transcribes gibberish, which is worse.
+  Every buffer goes through an `AVAudioConverter` first.
+- **Whisper hallucinates on silence.** A held key with nothing said comes back
+  as "Thank you." or a stray subtitle line, confidently. Anything under a third
+  of a second is discarded without transcribing.
+
 ## Interruption
 
 She must stop talking the moment you start. A companion that talks over you is
-immediately irritating, and `VoiceEngine.stop()` has to cut the audio, not fade
-it out politely.
+immediately irritating, and `VoiceEngine.stop()` cuts the audio rather than
+fading it politely.
+
+**Push-to-talk makes this free.** Pressing the talk key stops her — it is an
+unambiguous signal, and no acoustics are involved.
+
+Interrupting by voice alone is a different and much larger problem: her own
+output through the speakers is the loudest thing the microphone can hear, so
+detecting that *you* started talking means echo cancellation. That is a real
+project with real misfires, and the hotkey sidesteps it entirely. Worth
+revisiting only if hands-free use turns out to matter.
