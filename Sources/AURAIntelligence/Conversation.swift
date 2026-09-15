@@ -13,8 +13,8 @@ import AURAAnalytics
 public actor Conversation {
 
     public enum Event: Sendable {
-        /// A checked sentence. Display it, and speak it.
-        case sentence(String)
+        /// A checked sentence, with the figures it drew on.
+        case sentence(String, citations: [OutputGuard.Citation])
         /// A sentence the guard refused. Never shown to the user — surfaced so
         /// the app can retry or apologise rather than silently truncating.
         case withheld(reason: String)
@@ -43,7 +43,8 @@ public actor Conversation {
             func emit(_ releases: [SentenceStream.Release]) {
                 for release in releases {
                     switch release {
-                    case .allow(let sentence): onEvent(.sentence(sentence))
+                    case .allow(let sentence, let citations):
+                        onEvent(.sentence(sentence, citations: citations))
                     case .withhold(_, let reason): onEvent(.withheld(reason: reason))
                     }
                 }

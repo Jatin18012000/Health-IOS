@@ -80,7 +80,7 @@ struct SentenceStreamTests {
         for token in ["Your ", "HRV ", "was ", "23", ".", "8", " ms",
                       ", ", "the ", "6th ", "percentile", ".", " "] {
             for release in stream.append(token) {
-                if case .allow(let sentence) = release { released.append(sentence) }
+                if case .allow(let sentence, _) = release { released.append(sentence) }
             }
         }
         #expect(released == ["Your HRV was 23.8 ms, the 6th percentile."])

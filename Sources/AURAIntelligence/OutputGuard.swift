@@ -41,6 +41,44 @@ public struct OutputGuard: Sendable {
         public let evidence: String
     }
 
+    /// A number the text may contain, and where it came from.
+    ///
+    /// The guard used to build a bare `Set<Double>`, which was enough to reject
+    /// fabrication but discarded the other half of the answer: *which* figure
+    /// authorised a number. Citations need the positives.
+    struct Attribution {
+        /// How specifically this identifies its figure. Lower is stronger.
+        enum Strength: Int, Comparable {
+            /// The figure's own value. Identifies it outright.
+            case primary = 0
+            /// A percentile, a change, a goal — clearly derived from it.
+            case derived = 1
+            /// A baseline mean or sample size. Ordinary-looking numbers that
+            /// collide with everything.
+            case weak = 2
+
+            static func < (a: Strength, b: Strength) -> Bool {
+                a.rawValue < b.rawValue
+            }
+        }
+
+        let value: Double
+        /// Nil for free numbers, which need no source and must never be cited
+        /// as if they were findings.
+        let metric: String?
+        let label: String?
+        let strength: Strength
+    }
+
+    /// A figure a sentence actually drew on.
+    public struct Citation: Sendable, Hashable, Identifiable {
+        public var id: String { metric }
+        public let metric: String
+        public let label: String
+        /// The numeral as it appeared in the text.
+        public let matched: String
+    }
+
     /// What kind of quantity a value is, which decides how it may be reworded.
     ///
     /// A derivation is only honest if the source value is actually the kind of
@@ -120,18 +158,31 @@ public struct OutputGuard: Sendable {
     // MARK: - Allowed numbers
 
     static func allowedNumbers(in brief: HealthBrief) -> Set<Double> {
-        var allowed = freeNumbers
+        Set(attributions(in: brief).map(\.value))
+    }
 
-        func add(_ value: Double?, _ kind: Quantity) {
+    static func attributions(in brief: HealthBrief) -> [Attribution] {
+        var out: [Attribution] = freeNumbers.map {
+            Attribution(value: $0, metric: nil, label: nil, strength: .weak)
+        }
+
+        func add(_ value: Double?, _ kind: Quantity,
+                 _ metric: String? = nil, _ label: String? = nil,
+                 _ strength: Attribution.Strength = .derived) {
             guard let value else { return }
-            allowed.formUnion(derivations(of: abs(value), as: kind))
+            for v in derivations(of: abs(value), as: kind) {
+                out.append(Attribution(value: v, metric: metric,
+                                       label: label, strength: strength))
+            }
         }
 
         for figure in brief.figures {
             let kind: Quantity = minuteValued.contains(figure.metric) ? .durationMinutes : .count
-            add(figure.value, kind)
-            add(figure.changePercent, .percent)
-            add(figure.personalPercentile, .fraction)
+            add(figure.value, kind, figure.metric, figure.label, .primary)
+            add(figure.personalPercentile, .fraction, figure.metric,
+                "\(figure.label) percentile", .derived)
+            add(figure.changePercent, .percent, figure.metric,
+                "\(figure.label) change", .derived)
         }
 
         // Goals and progress against them. Without this the guard blocks her
@@ -139,10 +190,11 @@ public struct OutputGuard: Sendable {
         // computed — a safety check that rejects honest statements is a defect,
         // not caution.
         for goal in brief.goals {
-            add(goal.target, .count)
-            add(goal.value, .count)
-            add(goal.percent, .percent)
-            add(abs(goal.value - goal.target), .count)
+            add(goal.value, .count, goal.metric, goal.label, .primary)
+            add(goal.target, .count, goal.metric, "\(goal.label) goal", .derived)
+            add(goal.percent, .percent, goal.metric, "\(goal.label) goal progress", .derived)
+            add(abs(goal.value - goal.target), .count, goal.metric,
+                "\(goal.label) vs goal", .weak)
         }
 
         // Coefficients and sample sizes already quoted in the observations —
@@ -150,14 +202,62 @@ public struct OutputGuard: Sendable {
         for observation in brief.observations {
             for match in numerals(in: observation.text) {
                 if let v = Double(match.text.replacingOccurrences(of: ",", with: "")) {
-                    add(abs(v), .plain)
+                    add(abs(v), .plain, "Observation", "observation", .derived)
                 }
             }
         }
 
         let year = brief.range.end.year
-        allowed.formUnion(((year - 10)...(year + 1)).map(Double.init))
-        return allowed
+        for y in (year - 10)...(year + 1) {
+            out.append(Attribution(value: Double(y), metric: nil,
+                                   label: nil, strength: .weak))
+        }
+        return out
+    }
+
+    /// Which figures a sentence actually drew on.
+    ///
+    /// One chip per FIGURE, not per numeral: "7h 35m" is two numerals from one
+    /// fact, and two chips both reading "Sleep" would be noise.
+    ///
+    /// Two rules resolve ambiguity, both learned from getting this wrong:
+    ///
+    /// 1. **An already-cited metric wins.** Once HRV is cited for "23.8", the
+    ///    "6" in "the 6th percentile" belongs to it — not to the score
+    ///    component that also happens to round to 6.
+    /// 2. **Otherwise the strongest attribution wins.** Before ranking, the 7
+    ///    in "7h 35m" cited *steps*, because 7,345 rounds to 7 thousand.
+    public func citations(in text: String, against brief: HealthBrief) -> [Citation] {
+        let attributed = Self.attributions(in: brief).filter { $0.metric != nil }
+        var found: [Citation] = []
+        var seen: Set<String> = []
+
+        for match in Self.numerals(in: text) {
+            guard let value = Double(match.text.replacingOccurrences(of: ",", with: ""))
+            else { continue }
+
+            let candidates = attributed.filter { abs(value - $0.value) <= Self.tolerance }
+            guard !candidates.isEmpty else { continue }
+
+            // Rule 1: this numeral corroborates something already cited.
+            if candidates.contains(where: { seen.contains($0.metric ?? "") }) { continue }
+
+            // Rule 2: strongest attribution.
+            guard let best = candidates.min(by: { $0.strength < $1.strength }),
+                  let metric = best.metric else { continue }
+
+            // A weak attribution from a lone small number is a coincidence, not
+            // a citation. "6" matching some component is not evidence she used it.
+            if best.strength == .weak, value < 100, !match.text.contains(".") {
+                continue
+            }
+
+            seen.insert(metric)
+            found.append(Citation(metric: metric,
+                                  label: best.label ?? metric,
+                                  matched: match.text))
+        }
+        return found
     }
 
     /// Every honest way a figure can appear in prose. Anything here is a

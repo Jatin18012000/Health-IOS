@@ -254,10 +254,10 @@ private struct TurnBubble: View {
                             HStack(spacing: 5) {
                                 Image(systemName: "checkmark")
                                     .font(.system(size: 8, weight: .bold))
-                                Text(citation.value)
+                                Text(citation.matched)
                                     .font(.system(size: 10, weight: .medium))
                                     .monospacedDigit()
-                                Text(citation.source)
+                                Text(citation.label)
                                     .font(.system(size: 10))
                                     .foregroundStyle(theme.textSecondary)
                             }

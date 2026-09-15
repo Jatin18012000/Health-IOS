@@ -22,15 +22,10 @@ public final class ConversationViewModel {
         public let id = UUID()
         public let speaker: Speaker
         public var text: String
-        /// Figures from the brief that this turn actually quoted.
-        public var citations: [Citation] = []
+        /// Figures from the brief this turn actually quoted, deduplicated
+        /// across its sentences.
+        public var citations: [OutputGuard.Citation] = []
         public var isStreaming = false
-    }
-
-    public struct Citation: Identifiable, Equatable {
-        public let id = UUID()
-        public let value: String
-        public let source: String
     }
 
     public enum Status: Equatable {
@@ -117,8 +112,8 @@ public final class ConversationViewModel {
 
     private func handle(_ event: Conversation.Event) {
         switch event {
-        case .sentence(let sentence):
-            appendToCurrentTurn(sentence)
+        case .sentence(let sentence, let citations):
+            appendToCurrentTurn(sentence, citations: citations)
             status = .answering
             speak(sentence)
 
@@ -138,10 +133,18 @@ public final class ConversationViewModel {
         }
     }
 
-    private func appendToCurrentTurn(_ sentence: String) {
+    private func appendToCurrentTurn(_ sentence: String,
+                                     citations: [OutputGuard.Citation]) {
         guard let index = turns.lastIndex(where: { $0.speaker == .aura && $0.isStreaming })
         else { return }
         turns[index].text += turns[index].text.isEmpty ? sentence : " " + sentence
+
+        // Deduplicated across the whole turn: three sentences about sleep
+        // produce one chip, not three.
+        let existing = Set(turns[index].citations.map(\.metric))
+        for citation in citations where !existing.contains(citation.metric) {
+            turns[index].citations.append(citation)
+        }
     }
 
     private func finishStreamingTurn() {

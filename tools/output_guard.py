@@ -80,67 +80,138 @@ def derivations(value, kind="plain"):
     return {float(v) for v in out}
 
 
-def allowed_numbers(brief):
-    """Every number the text may contain, with the kind of each source value.
+# How strongly an attribution identifies a figure. Lower is stronger.
+PRIMARY, DERIVED, WEAK = 0, 1, 2
 
-    Getting the kinds right is the whole job: too narrow and honest prose gets
-    blocked, too broad and fabrication gets through.
+
+def attributions(brief):
+    """Every number the text may contain, tagged with source and strength.
+
+    This used to return a bare set, which was enough to REJECT fabrication but
+    threw away the other half of the answer: *which* figure authorised a number.
+    Citations need the positives.
+
+    Strength matters because small numbers are ambiguous. In "7h 35m" the 7 is
+    hours of sleep, but it also happens to be 7,345 steps rounded to thousands
+    -- and first-match-wins cited the steps. Ranking each attribution by how
+    specifically it identifies its figure is what settles that.
+
+    Returns (value, metric, label, rank). `metric` is None for free numbers,
+    which need no source and must never be cited as if they were findings.
     """
-    allowed = {float(n) for n in FREE_NUMBERS}
+    out = []
 
-    def add(value, kind):
+    def add(value, kind, metric=None, label=None, rank=DERIVED):
         if isinstance(value, (int, float)) and not isinstance(value, bool):
-            allowed.update(derivations(abs(float(value)), kind))
+            for v in derivations(abs(float(value)), kind):
+                out.append((v, metric, label, rank))
+
+    for n in FREE_NUMBERS:
+        out.append((float(n), None, None, WEAK))
 
     for figure in brief.get("figures", []):
         metric = figure.get("metric", "")
-        # Only genuinely minute-valued metrics get the h/m treatment.
+        label = figure.get("label", metric)
         kind = "duration_minutes" if metric in {
             "AppleExerciseTime", "AppleStandTime", "TimeInDaylight", "MindfulSession"
         } else "count"
-        add(figure.get("value"), kind)
-        add(figure.get("baseline_mean"), kind)
-        add(figure.get("change_percent"), "percent")
-        add(figure.get("personal_percentile"), "fraction")
-        add(figure.get("baseline_n"), "plain")
+        add(figure.get("value"), kind, metric, label, PRIMARY)
+        add(figure.get("personal_percentile"), "fraction", metric, f"{label} percentile", DERIVED)
+        add(figure.get("change_percent"), "percent", metric, f"{label} change", DERIVED)
+        # A baseline mean and a sample size identify a figure weakly: both are
+        # ordinary-looking numbers that collide with everything.
+        add(figure.get("baseline_mean"), kind, metric, f"{label} baseline", WEAK)
+        add(figure.get("baseline_n"), "plain", metric, f"{label} sample size", WEAK)
 
-    # Goals and the progress against them. Without this the guard blocks her
-    # from saying "you passed your 8,000 step goal" -- which is true, computed,
-    # and exactly the kind of thing a companion should say.
     for goal in brief.get("goals", []):
-        add(goal.get("target"), "count")
-        add(goal.get("value"), "count")
-        add(goal.get("percent"), "percent")
-        # The shortfall or surplus, which is the natural way to phrase it.
+        label = goal.get("metric", "goal")
+        add(goal.get("value"), "count", label, label, PRIMARY)
+        add(goal.get("target"), "count", label, f"{label} goal", DERIVED)
+        add(goal.get("percent"), "percent", label, f"{label} goal progress", DERIVED)
         if isinstance(goal.get("value"), (int, float)) and isinstance(goal.get("target"), (int, float)):
-            add(abs(goal["value"] - goal["target"]), "count")
+            add(abs(goal["value"] - goal["target"]), "count", label, f"{label} vs goal", WEAK)
 
     sleep = brief.get("sleep") or {}
-    for key in ("asleep_min", "core_min", "deep_min", "rem_min", "awake_min"):
-        add(sleep.get(key), "duration_minutes")
-    add(sleep.get("efficiency"), "percent")
-    add(sleep.get("personal_percentile"), "fraction")
-    add(sleep.get("baseline_n"), "plain")
+    add(sleep.get("asleep_min"), "duration_minutes", "Sleep", "asleep", PRIMARY)
+    for key in ("core_min", "deep_min", "rem_min", "awake_min"):
+        add(sleep.get(key), "duration_minutes", "Sleep", key.replace("_min", ""), DERIVED)
+    add(sleep.get("efficiency"), "percent", "Sleep", "efficiency", DERIVED)
+    add(sleep.get("personal_percentile"), "fraction", "Sleep", "sleep percentile", DERIVED)
+    add(sleep.get("baseline_n"), "plain", "Sleep", "comparable nights", WEAK)
 
     score = brief.get("score") or {}
-    add(score.get("value"), "plain")
-    for v in (score.get("components") or {}).values():
-        add(v, "plain")
+    add(score.get("value"), "plain", "Score", "health score", PRIMARY)
+    for name, v in (score.get("components") or {}).items():
+        add(v, "plain", "Score", f"{name} component", WEAK)
 
-    # Coefficients and sample sizes already quoted in the observations.
     for obs in brief.get("observations", []):
         for match in NUMERAL.finditer(obs.get("text", "")):
             try:
-                add(abs(float(match.group().replace(",", ""))), "plain")
+                add(abs(float(match.group().replace(",", ""))), "plain",
+                    "Observation", "observation", DERIVED)
             except ValueError:
                 pass
 
     day = brief.get("day", "")
     if len(day) >= 4 and day[:4].isdigit():
         year = int(day[:4])
-        allowed |= {float(y) for y in range(year - 10, year + 2)}
+        for y in range(year - 10, year + 2):
+            out.append((float(y), None, None, WEAK))
 
-    return allowed
+    return out
+
+
+def allowed_numbers(brief):
+    """Set view, used by the rejection path. Rank is irrelevant there: a number
+    is authorised or it is not."""
+    return {value for value, _, _, _ in attributions(brief)}
+
+
+def citations(text, brief, tolerance=0.051):
+    """Which figures this text actually drew on.
+
+    One chip per FIGURE, not per numeral: "7h 35m" is two numerals from one
+    fact, and two chips both reading "Sleep" would be noise. Free numbers cite
+    nothing -- "a couple of days" is not a finding.
+
+    Two rules resolve ambiguity, both learned from getting it wrong:
+
+    1. **An already-cited metric wins.** Once HRV is cited for "23.8", the "6"
+       in "the 6th percentile" belongs to it too -- not to the score component
+       that also happens to round to 6.
+    2. **Otherwise the strongest attribution wins.** A figure's own value
+       identifies it; a baseline mean or sample size barely identifies anything.
+    """
+    attrs = [a for a in attributions(brief) if a[1] is not None]
+    found, seen = [], set()
+
+    for match in NUMERAL.finditer(text):
+        try:
+            value = float(match.group().replace(",", ""))
+        except ValueError:
+            continue
+
+        candidates = [(rank, metric, label) for allowed, metric, label, rank in attrs
+                      if abs(value - allowed) <= tolerance]
+        if not candidates:
+            continue
+
+        # Rule 1: this numeral corroborates a metric already cited.
+        if any(metric in seen for _, metric, _ in candidates):
+            continue
+
+        # Rule 2: strongest attribution.
+        rank, metric, label = min(candidates, key=lambda c: c[0])
+
+        # A weak attribution from a lone small number is a coincidence, not a
+        # citation. "6" matching some component is not evidence she used it.
+        if rank == WEAK and value < 100 and "." not in match.group():
+            continue
+
+        seen.add(metric)
+        found.append({"metric": metric, "label": label, "matched": match.group()})
+
+    return found
 
 
 def check(text, brief, tolerance=0.051):

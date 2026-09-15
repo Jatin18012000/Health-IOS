@@ -37,8 +37,10 @@ import Foundation
 public struct SentenceStream: Sendable {
 
     public enum Release: Sendable, Equatable {
-        /// Checked and clear — display it and speak it.
-        case allow(String)
+        /// Checked and clear — display it and speak it, with the figures it
+        /// drew on. The citations come from the same pass that cleared it, so
+        /// a displayed chip and a permitted number can never disagree.
+        case allow(String, citations: [OutputGuard.Citation])
         /// Checked and rejected. Never displayed, never spoken.
         case withhold(sentence: String, reason: String)
     }
@@ -80,7 +82,8 @@ public struct SentenceStream: Sendable {
     private func check(_ sentence: String) -> Release {
         switch guardCheck.check(sentence, against: brief) {
         case .allow:
-            return .allow(sentence)
+            return .allow(sentence,
+                          citations: guardCheck.citations(in: sentence, against: brief))
         case .rewrite(let reason), .block(let reason):
             // No distinction at this layer. Once a sentence is suspect it is not
             // spoken, and the caller decides whether to retry or apologise.
