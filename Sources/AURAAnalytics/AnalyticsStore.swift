@@ -12,6 +12,9 @@ public protocol AnalyticsStore: Sendable {
     func daily(domain: MetricDomain, on day: CalendarDay) async throws -> [DailyMetric]
     func nights(in range: DayRange) async throws -> [SleepNight]
     func samples(metric: String, in range: DayRange) async throws -> [Sample]
+
+    /// The span the store actually holds. Nil when nothing has been imported.
+    func availableRange() async throws -> DayRange?
 }
 
 /// Every `HealthStore` is a valid `AnalyticsStore`.

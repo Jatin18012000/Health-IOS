@@ -62,7 +62,7 @@ let package = Package(
         .target(name: "AURAVoice", dependencies: ["AURACore"]),
 
         // The companion: mood state machine, sprite renderer, Live2D seam.
-        .target(name: "AURACharacter", dependencies: ["AURACore"]),
+        .target(name: "AURACharacter", dependencies: ["AURACore", "AURADesign"]),
 
         // Theme tokens, neon/glass components, chart styling.
         .target(name: "AURADesign", dependencies: ["AURACore"]),
