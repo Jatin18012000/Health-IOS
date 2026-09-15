@@ -2,6 +2,7 @@ import SwiftUI
 import AURACore
 import AURAAnalytics
 import AURADesign
+import AURACharacter
 
 /// The overview screen.
 ///
@@ -173,10 +174,23 @@ public struct DashboardView: View {
 
     private var centreColumn: some View {
         VStack(spacing: 14) {
-            CharacterStageView()
+            CharacterStageView(state: .idle, mood: mood)
                 .frame(maxHeight: .infinity)
             scorePanel
         }
+    }
+
+    /// Her expression comes from the day's real figures, never from randomness
+    /// and never from the language model. A recovery score of 92 must not
+    /// produce a sympathetic face, and an expression that flickers because a
+    /// model sampled differently is worse than no expression at all.
+    private var mood: CharacterMood {
+        MoodResolver().mood(
+            recovery: model.score?.components[.recovery],
+            sleepHours: model.night.map { $0.asleepMinutes / 60 },
+            stepProgress: model.figures
+                .first { $0.metric == "StepCount" }?.personalPercentile,
+            hour: Calendar.current.component(.hour, from: .now))
     }
 
     private var scorePanel: some View {

@@ -32,6 +32,7 @@ public enum CharacterMood: String, CaseIterable, Sendable, Codable {
 ///
 /// That seam is the reason to start with sprites rather than waiting on art:
 /// the upgrade is a file swap and a new conformer, not a rewrite.
+@MainActor
 public protocol CharacterRenderer: AnyObject, Sendable {
     /// Drive the visible state. Called at display rate while she speaks, so
     /// implementations must be cheap and must not allocate per frame.

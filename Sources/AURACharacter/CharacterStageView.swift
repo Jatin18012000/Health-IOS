@@ -13,8 +13,14 @@ public struct CharacterStageView: View {
     @State private var hoverPoint: CGPoint?
 
     private let assets: CharacterAssets
+    private let state: CharacterState
+    private let mood: CharacterMood
 
-    public init(assets: CharacterAssets = .placeholder) {
+    public init(state: CharacterState = .idle,
+                mood: CharacterMood = .neutral,
+                assets: CharacterAssets = .placeholder) {
+        self.state = state
+        self.mood = mood
         self.assets = assets
     }
 
@@ -58,8 +64,15 @@ public struct CharacterStageView: View {
                 }
             }
         }
-        .onAppear { renderer.start() }
+        .onAppear {
+            renderer.start()
+            renderer.apply(state: state, mood: mood)
+        }
         .onDisappear { renderer.stop() }
+        // Driven from outside rather than by a method call: a View is a value,
+        // so calling into a copy of it would silently do nothing.
+        .onChange(of: state) { _, new in renderer.apply(state: new, mood: mood) }
+        .onChange(of: mood) { _, new in renderer.apply(state: state, mood: new) }
     }
 
     // MARK: Layers
@@ -133,15 +146,7 @@ public struct CharacterStageView: View {
         }
         .padding(16)
     }
-
-    // MARK: Control
-
-    /// Drive her from outside — the dashboard sets this from the day's figures.
-    public func update(state: CharacterState, mood: CharacterMood) {
-        renderer.apply(state: state, mood: mood)
-    }
 }
-
 /// Where the character's artwork comes from.
 ///
 /// All optional: the app must render correctly before any of it exists, because

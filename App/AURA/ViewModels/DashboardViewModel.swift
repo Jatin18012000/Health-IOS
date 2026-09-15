@@ -107,9 +107,10 @@ public final class DashboardViewModel {
     private func reload() async throws {
         score = try await scores.score(on: day)
 
+        let today = day
         figures = try await withThrowingTaskGroup(of: TrendEngine.Figure?.self) { group in
             for metric in Self.headlineMetrics {
-                group.addTask { [trends] in try await trends.figure(metric, on: day) }
+                group.addTask { [trends] in try await trends.figure(metric, on: today) }
             }
             var collected: [TrendEngine.Figure] = []
             for try await figure in group {
