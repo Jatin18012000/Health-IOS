@@ -96,7 +96,11 @@ public struct SourceResolver: Sendable {
         return total
     }
 
-    static func merge(_ intervals: [(start: Date, end: Date)]) -> [(start: Date, end: Date)] {
+    /// Collapse overlapping intervals into disjoint ones, preserving total
+    /// covered time. Public because the sleep rollup unions intervals with it:
+    /// an InBed interval contains every stage inside it, so adding durations
+    /// counts the same minutes several times over.
+    public static func merge(_ intervals: [(start: Date, end: Date)]) -> [(start: Date, end: Date)] {
         guard !intervals.isEmpty else { return [] }
         let sorted = intervals.sorted { $0.start < $1.start }
         var out: [(start: Date, end: Date)] = [sorted[0]]
