@@ -33,10 +33,11 @@ system to **one process and one folder**.
 │                       ALL arithmetic lives here           │
 └──────────────────────┬───────────────────────────────────┘
 ┌──────────────────────▼───────────────────────────────────┐
-│  AURAStore            SQLite (GRDB) + Parquet archive     │
+│  AURAIngest           streaming export.xml parser         │
+│                       + the import coordinator            │
 └──────────────────────┬───────────────────────────────────┘
 ┌──────────────────────▼───────────────────────────────────┐
-│  AURAIngest           streaming export.xml parser         │
+│  AURAStore            SQLite (GRDB) + Parquet archive     │
 └──────────────────────┬───────────────────────────────────┘
 ┌──────────────────────▼───────────────────────────────────┐
 │  AURACore             metrics · units · days · dedup      │

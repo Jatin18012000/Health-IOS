@@ -40,14 +40,15 @@ let package = Package(
         // Domain vocabulary. Depends on nothing. Everything depends on it.
         .target(name: "AURACore"),
 
-        // Apple Health export -> normalized samples. Streaming, no DOM.
-        .target(name: "AURAIngest", dependencies: ["AURACore"]),
-
         // SQLite persistence + the Parquet archive tier.
         .target(name: "AURAStore", dependencies: [
             "AURACore",
             .product(name: "GRDB", package: "GRDB.swift"),
         ]),
+
+        // Apple Health export -> normalized samples -> the store.
+        // Depends on AURAStore because ingest is the layer that writes.
+        .target(name: "AURAIngest", dependencies: ["AURACore", "AURAStore"]),
 
         // Rollups, trends, correlations, scores, anomaly detection.
         // All arithmetic lives here -- never in a prompt. See docs/INTELLIGENCE.md.
