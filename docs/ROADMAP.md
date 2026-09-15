@@ -24,27 +24,31 @@ track unblocked until the rig exists, not a competing approach.
   664,515 real records
 - Architecture and data-model documentation
 
-### M1 — Store · ~4 days
+### M1 — Store · written, not yet compiled
 
 - GRDB schema matching the reference pipeline
 - `SQLiteHealthStore` implementing `HealthStore`
-- Idempotent ingest; rollup rebuild scoped to affected days
-- **Done when** the Swift store reproduces the reference pipeline's output on
-  the same export, diffed row for row.
+- `RollupBuilder` — daily aggregation and sleep reconstruction
+- Idempotent ingest by index probe; rollup rebuild scoped to affected days
+- **Acceptance:** `Tests/AURAIngestTests/ConformanceTests.swift` reads the same
+  `expected.json` that `tools/conformance.py` asserts, so the two
+  implementations cannot drift apart silently.
+- **Remaining:** `swift build`, then run the suite on the Mac.
 
-### M2 — Import · ~4 days
+### M2 — Import · written, not yet compiled
 
 - `AppleHealthImporter` via streaming `XMLParser`
-- Progress reporting; import runs off the main actor
+- `ImportSession` — parse, store, rebuild, with real counts throughout
+- Progress reporting; the parse runs off the main actor
 - Unit validation that rejects loudly rather than assuming
-- Drag-and-drop import UI
-- **Done when** a 293 MB export imports without blocking the UI, and importing
-  it a second time changes nothing.
+- **Remaining:** drag-and-drop UI (belongs with M3), and a run against the real
+  293 MB export to confirm the parse holds up at scale.
 
-### M3 — Dashboard · ~3 weeks
+### M3 — Dashboard · analytics done, views remaining
 
-- `TrendEngine`: deltas, slopes, correlations with sample sizes
-- `HealthScore` with an explainable breakdown
+- ~~`TrendEngine`: deltas, slopes, correlations with sample sizes~~ **done**
+- ~~`HealthScoreEngine` with an explainable breakdown~~ **done**
+- Design published and built on real figures — every number in it is computed
 - Theme tokens, glass panels, neon treatment
 - Swift Charts: sparklines, bars, donuts, radial gauges
 - Honest empty states for sparse metrics (VO2 Max, blood pressure, weight)
