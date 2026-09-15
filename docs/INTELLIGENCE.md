@@ -51,22 +51,47 @@ It costs nothing, downloads nothing, and is already on the machine. For a
 Used for the writing: turning a `HealthBrief` into something warm and specific,
 and holding a conversation. Apache 2.0, so no licence entanglement.
 
-Size depends on unified memory — a 4-bit 27B-class model needs ~16–19 GB
-resident, and macOS gives the GPU only about two-thirds to three-quarters of
-unified memory, so a model that "fits in 17 GB" needs meaningfully more machine
-than that:
+**Target machine: MacBook M5, 24 GB unified memory, 1 TB SSD.**
+The model tier is settled by that, and the reasoning is worth keeping because it
+is the constraint that decides whether she stutters.
 
-| Unified memory | Practical choice | Notes |
-|---|---|---|
-| 16 GB | Qwen3.x 8B, 4-bit | 14B fits but leaves little room for the TTS model and the app |
-| 24 GB | **Qwen3.x 14B, 4-bit** | **The default.** ~8-9 GB of weights, ~12 GB working |
-| 32 GB+ | Qwen3.8-27B class, 4-bit | ~18 GB download; 32 GB is the practical floor |
+macOS hands the GPU roughly two-thirds to three-quarters of unified memory, so
+the real budget is ~16-18 GB, not 24. And during a spoken exchange four things
+are resident at once, not one:
 
-**Qwen3.x 14B at 4-bit is the working default** -- the best quality that still
-leaves headroom for the neural TTS model, Whisper, and the app itself sharing
-the same unified memory. Remember that all four are resident at once during a
-spoken exchange; sizing the LLM as though it has the machine to itself is how
-you end up with a companion that stutters mid-sentence.
+| Resident | Size |
+|---|---|
+| Qwen3.x 14B, 4-bit weights | ~8-9 GB |
+| KV cache @ 16K context | ~2-3 GB |
+| Neural TTS (Kokoro class) | ~0.3 GB |
+| WhisperKit (base/small) | ~0.2-0.5 GB |
+| App, SwiftUI, character stage | ~0.5-1 GB |
+| **Total** | **~12-14 GB** |
+
+That leaves real headroom inside the ~16-18 GB the GPU actually gets. Comfortable,
+not tight.
+
+### Why not go bigger
+
+A 27B-class model at 4-bit is ~18 GB of weights alone — at or past the GPU
+allocation before the KV cache, the TTS model or the app exist. It would load,
+then swap, and the symptom is not "slower": it is her pausing mid-sentence,
+which destroys the illusion far more than slightly plainer prose would.
+
+**14B at 4-bit is the right call on this machine, and the ceiling on it.**
+
+### Context budget
+
+Cap the chat at ~16K tokens. This costs nothing here, and that is the payoff of
+the `HealthBrief` design: a brief is a few hundred tokens because the arithmetic
+already happened in Swift. An architecture that fed raw data to the model would
+need every token of context it could buy — this one never does.
+
+### Disk
+
+Trivial against 1 TB: ~34 MB of health data, ~10-12 GB of model weights,
+a few hundred MB of character assets. Storage is not a constraint on this
+project at any point.
 
 MLX is the right runtime on Apple Silicon — measurably faster than the
 alternatives for models under ~14B, and it loads weights in-process so there is
