@@ -74,22 +74,41 @@ public struct HealthBrief: Codable, Sendable {
         }
     }
 
+    /// Context you gave her: confirmed facts and annotated stretches of days.
+    ///
+    /// Carried as plain sentences rather than structured records, because that
+    /// is all the model needs and because it keeps the guard's job simple —
+    /// every number in here is one you said, so repeating it is never
+    /// fabrication.
+    public struct Recollection: Codable, Sendable {
+        public let text: String
+        /// True for a date-ranged annotation, false for a standing fact.
+        public let isPeriod: Bool
+
+        public init(text: String, isPeriod: Bool) {
+            self.text = text
+            self.isPeriod = isPeriod
+        }
+    }
+
     public let range: DayRange
     public let comparisonRange: DayRange?
     public let figures: [Figure]
     public let goals: [GoalProgress]
+    public let memory: [Recollection]
     public let observations: [Observation]
     /// Days in `range` with no data, so she can say "I only have four days of
     /// this week" instead of quietly averaging over a gap.
     public let missingDays: Int
 
     public init(range: DayRange, comparisonRange: DayRange?, figures: [Figure],
-                goals: [GoalProgress] = [], observations: [Observation],
-                missingDays: Int) {
+                goals: [GoalProgress] = [], memory: [Recollection] = [],
+                observations: [Observation], missingDays: Int) {
         self.range = range
         self.comparisonRange = comparisonRange
         self.figures = figures
         self.goals = goals
+        self.memory = memory
         self.observations = observations
         self.missingDays = missingDays
     }

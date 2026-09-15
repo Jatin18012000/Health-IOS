@@ -23,6 +23,7 @@ let package = Package(
         .library(name: "AURAIngest",       targets: ["AURAIngest"]),
         .library(name: "AURAStore",        targets: ["AURAStore"]),
         .library(name: "AURAAnalytics",    targets: ["AURAAnalytics"]),
+        .library(name: "AURAMemory",       targets: ["AURAMemory"]),
         .library(name: "AURAIntelligence", targets: ["AURAIntelligence"]),
         .library(name: "AURAVoice",        targets: ["AURAVoice"]),
         .library(name: "AURACharacter",    targets: ["AURACharacter"]),
@@ -59,6 +60,13 @@ let package = Package(
         // All arithmetic lives here -- never in a prompt. See docs/INTELLIGENCE.md.
         .target(name: "AURAAnalytics", dependencies: ["AURACore", "AURAStore"]),
 
+        // What she remembers: confirmed facts, context annotations,
+        // conversation history. Its own database — see MemoryStore.
+        .target(name: "AURAMemory", dependencies: [
+            "AURACore",
+            .product(name: "GRDB", package: "GRDB.swift"),
+        ]),
+
         // LLM provider abstraction, context building, output safety.
         //
         // MLX is linked here, but MLXModel is behind `#if canImport(MLXLLM)`
@@ -66,7 +74,7 @@ let package = Package(
         // brief and the sentence stream are all testable with no weights on
         // the machine.
         .target(name: "AURAIntelligence", dependencies: [
-            "AURACore", "AURAAnalytics",
+            "AURACore", "AURAAnalytics", "AURAMemory",
             .product(name: "MLXLLM", package: "mlx-swift-lm"),
             .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
         ]),
@@ -91,5 +99,6 @@ let package = Package(
         .testTarget(name: "AURAAnalyticsTests", dependencies: ["AURAAnalytics"]),
         .testTarget(name: "AURACoreTests",      dependencies: ["AURACore"]),
         .testTarget(name: "AURAIntelligenceTests", dependencies: ["AURAIntelligence"]),
+        .testTarget(name: "AURAMemoryTests",       dependencies: ["AURAMemory"]),
     ]
 )

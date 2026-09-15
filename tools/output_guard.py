@@ -152,6 +152,18 @@ def attributions(brief):
             except ValueError:
                 pass
 
+    # Anything YOU told her. Without this she is blocked from repeating your own
+    # words back: a fact reading "aiming for a sub-1:45 half" contains a 45,
+    # which matches no computed figure and reads as fabrication. It is the
+    # opposite -- it is the one kind of statement she cannot have invented.
+    for text in brief.get("memory", []):
+        for match in NUMERAL.finditer(text):
+            try:
+                add(abs(float(match.group().replace(",", ""))), "plain",
+                    "Memory", "something you told her", DERIVED)
+            except ValueError:
+                pass
+
     day = brief.get("day", "")
     if len(day) >= 4 and day[:4].isdigit():
         year = int(day[:4])
@@ -264,6 +276,8 @@ BRIEF = {
     "score": {"value": 63.5, "components": {"activity": 93.7, "recovery": 5.6}},
     "goals": [{"metric": "StepCount", "target": 8000, "value": 10171.6,
                "percent": 127.1, "met": True}],
+    "memory": ["aiming for a sub-1:45 half marathon in March",
+               "travelling 3 Sep to 10 Sep"],
     "observations": [{"text": "StepCount and HRV move oppositely (r=-0.30, n=62)",
                       "confidence": 0.6}],
 }
@@ -282,6 +296,8 @@ CASES = [
      None, None, "score and components, rounded"),
     ("You passed your 8,000 step goal — 10,172, about 127% of it.",
      None, None, "goal, progress and surplus are all computed and carried"),
+    ("You said you're aiming for a sub-1:45 half.",
+     None, None, "repeating your own words back is never fabrication"),
 
     ("Your HRV was 31.2 ms last night.",
      "fabricated_figure", "31.2", "plausible, specific, computed by nobody"),

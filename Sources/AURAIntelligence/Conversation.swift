@@ -96,7 +96,11 @@ public actor Conversation {
         mentioning as a maybe, never as a finding.
         4. Where days are missing, say so rather than talking as if the window \
         were complete.
-        5. Be warm, specific and brief. Two or three sentences unless they \
+        5. Use the CONTEXT block to explain what the numbers show. A drop \
+        during a week they marked as illness is illness, not decline. Never \
+        treat context as a measurement, and never invent context that is not \
+        there.
+        6. Be warm, specific and brief. Two or three sentences unless they \
         asked for more. You are speaking aloud, so write the way people talk.
         """
 
@@ -117,6 +121,14 @@ public actor Conversation {
         for goal in brief.goals {
             lines.append("- \(goal.label) goal: \(format(goal.target)), "
                 + "at \(format(goal.percent))% — \(goal.isMet ? "met" : "not met")")
+        }
+
+        if !brief.memory.isEmpty {
+            lines.append("")
+            lines.append("CONTEXT THEY GAVE YOU (their words, not measurements):")
+            for recollection in brief.memory {
+                lines.append("- \(recollection.text)")
+            }
         }
 
         if !brief.observations.isEmpty {

@@ -207,6 +207,18 @@ public struct OutputGuard: Sendable {
             }
         }
 
+        // Anything you told her. Without this she is blocked from repeating
+        // your own words: a fact reading "aiming for a sub-1:45 half" contains
+        // a 45, which matches no computed figure and reads as fabrication. It
+        // is the opposite — the one kind of statement she cannot have invented.
+        for recollection in brief.memory {
+            for match in numerals(in: recollection.text) {
+                if let v = Double(match.text.replacingOccurrences(of: ",", with: "")) {
+                    add(abs(v), .plain, "Memory", "something you told her", .derived)
+                }
+            }
+        }
+
         let year = brief.range.end.year
         for y in (year - 10)...(year + 1) {
             out.append(Attribution(value: Double(y), metric: nil,

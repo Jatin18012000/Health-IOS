@@ -1,6 +1,7 @@
 import Foundation
 import AURACore
 import AURAAnalytics
+import AURAMemory
 
 /// Assembles the `HealthBrief` handed to the language model.
 ///
@@ -34,11 +35,16 @@ public struct BriefBuilder: Sendable {
     ]
 
     let goals: Goals
+    /// Optional: the brief is complete without it, and the app runs before any
+    /// memory exists.
+    let memory: MemoryStore?
 
-    public init(store: any AnalyticsStore, goals: Goals = .default) {
+    public init(store: any AnalyticsStore, goals: Goals = .default,
+                memory: MemoryStore? = nil) {
         self.trends = TrendEngine(store: store)
         self.scores = HealthScoreEngine(store: store)
         self.goals = goals
+        self.memory = memory
     }
 
     public func brief(for day: CalendarDay,
@@ -84,11 +90,28 @@ public struct BriefBuilder: Sendable {
         let range = DayRange.lastDays(window, endingOn: day)
         let trend = try await trends.trend(metric: "StepCount", endingOn: day, days: window)
 
+        var recollections: [HealthBrief.Recollection] = []
+        if let memory {
+            for fact in try await memory.liveFacts(on: day) {
+                recollections.append(.init(text: fact.text, isPeriod: false))
+            }
+            // Only annotations overlapping the window. A flu last March does
+            // not explain this week, and listing it would invite her to reach
+            // for it.
+            for annotation in try await memory.annotations(overlapping: range) {
+                var text = "\(annotation.kind.label.lowercased()) "
+                    + "\(annotation.range.start) to \(annotation.range.end)"
+                if let note = annotation.note, !note.isEmpty { text += " — \(note)" }
+                recollections.append(.init(text: text, isPeriod: true))
+            }
+        }
+
         return HealthBrief(
             range: range,
             comparisonRange: DayRange.lastDays(window, endingOn: range.start.adding(days: -1)),
             figures: figures,
             goals: goalProgress,
+            memory: recollections,
             observations: observations.sorted { $0.confidence > $1.confidence },
             // So she can say "I only have four days of this week" rather than
             // quietly averaging over a gap.
