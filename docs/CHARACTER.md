@@ -10,11 +10,26 @@ people expect.
 Not resolution, not art quality, not the number of poses. In rough order of
 impact per hour of work:
 
-1. **A mouth driven by real audio amplitude.** `VoiceEngine.speak` streams a
-   0...1 level at display rate specifically so the mouth tracks the waveform.
-   A mouth that flaps on a timer reads as a cartoon playing over audio; a mouth
-   that tracks amplitude reads as someone talking. This is the single highest-
-   leverage detail in the whole project.
+1. **A mouth driven by real audio amplitude — shaped, not raw.**
+   `VoiceEngine.speak` streams a 0...1 level at display rate so the mouth tracks
+   the waveform. A mouth that flaps on a timer reads as a cartoon playing over
+   audio; a mouth that tracks amplitude reads as someone talking. This is the
+   single highest-leverage detail in the whole project.
+
+   But the raw level does not work either, and the obvious fix is wrong.
+   Measured against a simulated speech envelope:
+
+   | | flutter | closes between words |
+   |---|---|---|
+   | raw amplitude | 0.27 | 1.00 |
+   | fast attack, slow release | 0.11 | **0.30** |
+   | gated (attack 0.5, release 0.25, gate 0.12) | 0.15 | **0.95** |
+
+   Fast attack with slow release is the standard shape for an audio compressor,
+   and it is wrong here: a compressor uses a slow release to avoid pumping, but
+   a mouth has to *close between words*, and the slow release leaves it hanging
+   open through 70% of the gaps — continuous mumbling. An explicit **noise
+   gate** buys the calm of a slow release without that. See `MouthShaper`.
 
 2. **Irregular idle motion.** Breathing and blinking on independent timers with
    jitter. Perfectly periodic motion is the tell that something is a loop —

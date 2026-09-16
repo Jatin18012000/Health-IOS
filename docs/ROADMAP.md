@@ -159,9 +159,16 @@ of which would have been expensive to find later:
 - ~~Golden snapshots against the real export~~ **written** and verified to
   catch a real regression; not committed, since it holds real figures
 
-### M9 — Live2D · when the rig lands
+### M9 — Live2D · seam written, rig still needed
 
-Slots in whenever the artwork is ready, not at a fixed point in the sequence.
+Slots in whenever the artwork is ready. The integration is written; the rig is
+not, and cannot be written from here.
+
+**The bridge is the least verified code in the project.** Everything else was
+either run or written against an API read from its own source. The Cubism SDK is
+a proprietary download that is not in this repository, so the Objective-C++
+bridge is written from the published API shape and its signatures need checking
+on first build. `docs/LIVE2D_SETUP.md` says so plainly and lists what to check.
 
 - Objective-C++ bridge over the Cubism Native SDK (it is C++, with no official
   Swift wrapper), behind an `NSViewRepresentable` wrapping an `MTKView`
@@ -170,6 +177,12 @@ Slots in whenever the artwork is ready, not at a fixed point in the sequence.
   renderer already uses — the pipeline is proven by then, only the consumer
   changes
 - Hair and ponytail physics, real eye tracking via `ParamEyeBallX/Y`
+- ~~`MouthShaper`~~ **written and measured** — raw amplitude flutters, and the
+  obvious fix (fast attack, slow release) leaves her mouth hanging open through
+  70% of the gaps between words. A noise gate fixes both.
+- ~~`CharacterManifest`~~ **written** — renderer selection plus a parameter
+  check, so a rig missing `ParamMouthOpenY` is caught at install rather than
+  the first time she speaks
 - **Done when** the swap is a manifest change and no dashboard code moved.
 
 ### Later — iOS companion

@@ -49,6 +49,7 @@ public final class ProceduralRenderer: CharacterRenderer {
     private var clock: TimeInterval = 0
     private var breathPeriod: Double = 5.0
     private var swayPeriod: Double = 8.3
+    private var mouth = MouthShaper()
     private var nextBlink: TimeInterval = 4
     private var blinkStarted: TimeInterval?
     private var ticker: Task<Void, Never>?
@@ -80,13 +81,13 @@ public final class ProceduralRenderer: CharacterRenderer {
         self.mood = mood
 
         if case .speaking(let level) = state {
-            // Straight from the audio tap. A mouth on a timer reads as a
-            // cartoon playing over audio; a mouth tracking the waveform reads
-            // as someone talking. This is the single highest-leverage detail
-            // in the whole character.
-            mouthOpen = min(1, max(0, level))
+            // From the audio tap, but SHAPED — raw amplitude flutters at frame
+            // rate and reads as flapping rather than talking. See MouthShaper
+            // for what was measured and why the obvious smoothing is wrong.
+            mouthOpen = mouth.next(level)
             glow = 0.3 + level * 0.5
         } else {
+            mouth.reset()
             mouthOpen = 0
             glow = mood == .sleepy ? 0.15 : 0.25
         }
