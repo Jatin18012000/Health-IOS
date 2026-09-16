@@ -65,16 +65,23 @@ struct RootView: View {
 
     @State private var section: Section = .overview
 
+    /// Bumped by a finished import so the dashboard rebuilds against the data
+    /// that now exists, rather than keeping the figures it loaded from the
+    /// store as it was before.
+    @State private var dataVersion = 0
+
     enum Section: String, CaseIterable, Identifiable {
         case overview = "Overview"
         case companion = "Companion"
         case memory = "Memory"
+        case data = "Import"
         var id: String { rawValue }
         var icon: String {
             switch self {
             case .overview:  "square.grid.2x2"
             case .companion: "bubble.left.and.text.bubble.right"
             case .memory:    "brain"
+            case .data:      "arrow.down.doc"
             }
         }
     }
@@ -86,7 +93,9 @@ struct RootView: View {
 
             switch section {
             case .overview:
-                DashboardView(model: DashboardViewModel(store: store))
+                DashboardView(model: DashboardViewModel(store: store),
+                              onImport: { section = .data })
+                    .id(dataVersion)
             case .companion:
                 // Rebuilt per appearance rather than held: the conversation is
                 // deliberately not persistent yet. Memory is M7, and a
@@ -113,6 +122,19 @@ struct RootView: View {
                     .foregroundStyle(theme.textSecondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
+
+            case .data:
+                // Rebuilt per appearance like the conversation: an import is a
+                // one-shot operation and a screen still showing last week's
+                // counts is a screen claiming something happened just now.
+                ImportView(
+                    model: ImportViewModel(store: store) { range in
+                        container.noteImport(range: range)
+                    },
+                    onDone: {
+                        dataVersion += 1
+                        section = .overview
+                    })
             }
         }
     }
@@ -228,6 +250,15 @@ final class AppContainer {
         let base = FileManager.default.urls(for: .applicationSupportDirectory,
                                             in: .userDomainMask).first!
         return base.appending(path: "AURA")
+    }
+
+    /// Records what an import changed.
+    ///
+    /// `latestDay` seeds the conversation's default day, so leaving it at the
+    /// value read when the app launched would have her answering questions
+    /// about a day that is no longer the most recent one.
+    func noteImport(range: DayRange?) {
+        if let range { latestDay = range.end }
     }
 
     func open() async {

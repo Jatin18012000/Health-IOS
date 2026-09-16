@@ -9,10 +9,13 @@ One-time setup, once you're on the Mac:
 
 1. Xcode → New Project → macOS → App, named `AURA`, at `App/AURA/`.
 2. File → Add Package Dependencies → Add Local → choose the repository root.
-3. Link `AURACore`, `AURAStore`, `AURAAnalytics`, `AURAIntelligence`,
-   `AURAVoice`, `AURACharacter`, `AURADesign`.
+3. Link `AURACore`, `AURAStore`, `AURAIngest`, `AURAAnalytics`,
+   `AURAIntelligence`, `AURAMemory`, `AURAVoice`, `AURACharacter`,
+   `AURADesign`.
 4. Signing & Capabilities → App Sandbox → enable **Audio Input** and
-   **User Selected File** read access (so the import can read the export).
+   **User Selected File** read access. The import screen needs the latter for
+   both the file panel and the drop target; without it a dropped folder reads
+   as empty rather than as denied, which looks like a broken importer.
 5. Add **`NSMicrophoneUsageDescription`** to Info.plist. Without it the app
    does not prompt for the microphone — it crashes the moment the audio engine
    starts, which looks like a bug in the talk button rather than a missing key.
