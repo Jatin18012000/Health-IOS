@@ -146,13 +146,18 @@ of which would have been expensive to find later:
 - **Remaining:** `swift build`, and living with it long enough to find out
   whether the fact proposals are useful or just noise.
 
-### M8 — Polish · ongoing
+### M8 — Polish · written, not yet compiled
 
-- `NeuralVoice` — the TTS upgrade that makes her feel like a character
-- Additional themes
-- Doctor-facing PDF export
-- Encrypted backup
-- Golden tests pinned against the real export
+- ~~`NeuralVoice`~~ **written** — Kokoro-82M on the Neural Engine, so it barely
+  contends with the language model holding the GPU
+- ~~Additional themes~~ **written** — four, including a light one that needs an
+  actual look before it ships
+- ~~Doctor-facing PDF export~~ **written** — deliberately containing no
+  generated prose, no scores and no reference ranges
+- ~~Encrypted backup~~ **written** — `VACUUM INTO` for a consistent snapshot,
+  AES-GCM, with the KDF trade recorded rather than hidden
+- ~~Golden snapshots against the real export~~ **written** and verified to
+  catch a real regression; not committed, since it holds real figures
 
 ### M9 — Live2D · when the rig lands
 

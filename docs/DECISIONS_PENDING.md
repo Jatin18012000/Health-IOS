@@ -109,7 +109,22 @@ what currently makes the numbers trustworthy.
 Kept as-is on that basis. Worth revisiting if you find yourself distrusting a
 percentile after a long illness.
 
-## 5. The low-trust sources
+## 5. The backup key derivation is fast, and arguably should not be
+
+`Backup` derives its key with HKDF-SHA256, which is the right tool for
+high-entropy input and the wrong one for a human-chosen passphrase: it is fast,
+so a brute-force attempt is cheap. A deliberately slow KDF — scrypt or Argon2 —
+would be materially stronger, and neither ships in CryptoKit.
+
+Right now the 12-character minimum is doing more work than it should have to.
+
+Options: leave it (the backup still needs the passphrase, and the threat model
+is a lost USB stick rather than a targeted attacker); add a small scrypt
+dependency; or raise the minimum and say plainly that the passphrase is the
+whole defence. Worth deciding before you put a backup anywhere you do not
+control.
+
+## 6. The low-trust sources
 
 Your export carries **20,885 samples from FitCloudPro** and 44 from NoiseFit,
 alongside the iPhone and Watch. They currently rank below Apple devices, so they
@@ -123,7 +138,7 @@ the data. **You know which device was on your wrist when; I don't.**
 
 ---
 
-## 6. Who is she?
+## 7. Who is she?
 
 Not asked yet, and it shapes the writing more than any other choice:
 
@@ -136,7 +151,7 @@ Not asked yet, and it shapes the writing more than any other choice:
 
 ---
 
-## 7. The rig: commission or do it yourself
+## 8. The rig: commission or do it yourself
 
 From `docs/CHARACTER.md`. Commissioning costs a few hundred pounds and takes it
 off your plate; Inochi Creator is free and makes it an art project. **This is
@@ -145,7 +160,7 @@ is worth more than any week of code.
 
 ---
 
-## 8. Smaller constants, all one-liners
+## 9. Smaller constants, all one-liners
 
 | Constant | Current | Note |
 |---|---|---|

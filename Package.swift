@@ -24,6 +24,7 @@ let package = Package(
         .library(name: "AURAStore",        targets: ["AURAStore"]),
         .library(name: "AURAAnalytics",    targets: ["AURAAnalytics"]),
         .library(name: "AURAMemory",       targets: ["AURAMemory"]),
+        .library(name: "AURAReport",       targets: ["AURAReport"]),
         .library(name: "AURAIntelligence", targets: ["AURAIntelligence"]),
         .library(name: "AURAVoice",        targets: ["AURAVoice"]),
         .library(name: "AURACharacter",    targets: ["AURACharacter"]),
@@ -72,6 +73,11 @@ let package = Package(
             .product(name: "GRDB", package: "GRDB.swift"),
         ]),
 
+        // The doctor-facing PDF. Contains no generated prose — see HealthReport.
+        .target(name: "AURAReport", dependencies: [
+            "AURACore", "AURAAnalytics", "AURAMemory",
+        ]),
+
         // LLM provider abstraction, context building, output safety.
         //
         // MLX is linked here, but MLXModel is behind `#if canImport(MLXLLM)`
@@ -106,5 +112,6 @@ let package = Package(
         .testTarget(name: "AURACoreTests",      dependencies: ["AURACore"]),
         .testTarget(name: "AURAIntelligenceTests", dependencies: ["AURAIntelligence"]),
         .testTarget(name: "AURAMemoryTests",       dependencies: ["AURAMemory"]),
+        .testTarget(name: "AURAStoreTests",        dependencies: ["AURAStore"]),
     ]
 )
