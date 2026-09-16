@@ -27,16 +27,12 @@ import AVFoundation
 public final class SystemVoice: NSObject, VoiceEngine, @unchecked Sendable {
 
     private let synthesizer = AVSpeechSynthesizer()
-    private let engine = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
-
-    private var levelHandler: (@Sendable (Double) -> Void)?
-    private var isTapped = false
+    private let playback = AudioPlayback()
 
     public private(set) var isSpeaking = false
 
-    /// Which system voice. Chosen once and kept: a companion whose voice changes
-    /// between sessions is a different companion.
+    /// Which system voice. Chosen once and kept: a companion whose voice
+    /// changes between sessions is a different companion.
     public var voiceIdentifier: String?
 
     /// 0...1, where 0.5 is the system default rate.
@@ -44,7 +40,6 @@ public final class SystemVoice: NSObject, VoiceEngine, @unchecked Sendable {
 
     public override init() {
         super.init()
-        engine.attach(player)
     }
 
     public func speak(_ text: String,
@@ -57,13 +52,12 @@ public final class SystemVoice: NSObject, VoiceEngine, @unchecked Sendable {
             utterance.voice = voice
         }
 
-        levelHandler = onLevel
         isSpeaking = true
         defer { isSpeaking = false }
 
         var buffers: [AVAudioPCMBuffer] = []
 
-        // Render first, play second. Collecting the buffers lets the engine be
+        // Render first, play second. Collecting the buffers lets playback be
         // configured for the exact format the synthesiser produced, rather than
         // guessing one up front and resampling.
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
@@ -79,28 +73,8 @@ public final class SystemVoice: NSObject, VoiceEngine, @unchecked Sendable {
             }
         }
 
-        guard let format = buffers.first?.format else {
-            onLevel(0)
-            return
-        }
-
-        try startEngine(format: format)
-
-        for buffer in buffers {
-            player.scheduleBuffer(buffer, at: nil)
-        }
-
-        player.play()
-
-        // Wait for playback rather than for rendering. The buffers were ready
-        // long before this point.
-        let duration = buffers.reduce(0.0) {
-            $0 + Double($1.frameLength) / $1.format.sampleRate
-        }
-        try? await Task.sleep(for: .seconds(duration))
-
-        stop()
-        onLevel(0)
+        try Task.checkCancellation()
+        try await playback.play(buffers, onLevel: onLevel)
     }
 
     public func stop() {
@@ -110,67 +84,7 @@ public final class SystemVoice: NSObject, VoiceEngine, @unchecked Sendable {
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
         }
-        if player.isPlaying { player.stop() }
-        removeTap()
-        if engine.isRunning { engine.stop() }
-        levelHandler?(0)
+        playback.stop()
         isSpeaking = false
-    }
-
-    // MARK: - Engine and tap
-
-    private func startEngine(format: AVAudioFormat) throws {
-        if engine.isRunning { engine.stop() }
-        removeTap()
-
-        engine.connect(player, to: engine.mainMixerNode, format: format)
-        installTap(format: format)
-
-        engine.prepare()
-        do {
-            try engine.start()
-        } catch {
-            throw VoiceError.engineUnavailable(error.localizedDescription)
-        }
-    }
-
-    private func installTap(format: AVAudioFormat) {
-        // 1024 frames at 22–48 kHz lands between 20 and 45 ms — a little faster
-        // than a display frame, which is what a mouth needs. Larger buffers
-        // smear consonants into one long vowel.
-        player.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-            guard let self, let level = Self.rms(of: buffer) else { return }
-            self.levelHandler?(level)
-        }
-        isTapped = true
-    }
-
-    private func removeTap() {
-        guard isTapped else { return }
-        player.removeTap(onBus: 0)
-        isTapped = false
-    }
-
-    /// Root mean square of a buffer, mapped to a 0...1 the mouth can use.
-    ///
-    /// Speech RMS is small and lives in a narrow band, so a linear mapping leaves
-    /// the mouth barely open through normal speech. Converting to decibels and
-    /// normalising over a speech-shaped floor gives a range that actually reads
-    /// as talking.
-    static func rms(of buffer: AVAudioPCMBuffer) -> Double? {
-        guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else {
-            return nil
-        }
-        let n = Int(buffer.frameLength)
-        var sum: Float = 0
-        for i in 0..<n { sum += channel[i] * channel[i] }
-        let rms = sqrt(sum / Float(n))
-
-        guard rms > 0 else { return 0 }
-        let db = 20 * log10(Double(rms))
-
-        // −50 dB is near-silence between words, −10 dB is a loud vowel.
-        let floor = -50.0, ceiling = -10.0
-        return min(1, max(0, (db - floor) / (ceiling - floor)))
     }
 }

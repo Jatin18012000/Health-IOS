@@ -27,9 +27,26 @@ download. Ships first so she can talk in week three. It sounds like a system
 voice, and it will not give you the companion feeling — but having her speak
 early is what tells you whether the rest of the illusion is working.
 
-**2. `NeuralVoice` — local neural TTS.** A Kokoro/Piper-class model on the
-Neural Engine. Still entirely offline, dramatically warmer, and the upgrade that
-actually matters. This is the one to spend time on.
+**2. `NeuralVoice` — Kokoro-82M, via `kokoro-swift`.** Apache 2.0 for both the
+model and the code. Still entirely offline, dramatically warmer, and the upgrade
+that actually matters.
+
+Adding a second model to a machine already holding a 14B LLM sounds reckless,
+and it is not, for two reasons worth stating plainly:
+
+- **82M parameters** — a few hundred megabytes against the language model's
+  eight or nine gigabytes.
+- **It runs on the Neural Engine, not the GPU.** The ANE sits idle while MLX
+  holds the GPU, so the two barely contend. Around 100 ms to synthesise a
+  sentence, well inside the budget.
+
+It synthesises **per sentence**, which is not an optimisation but a consequence:
+`SentenceStream` already releases one guarded sentence at a time, so a sentence
+is exactly what arrives. Synthesising a whole response would mean waiting for
+generation to finish — the thing the streaming design exists to avoid.
+
+The engine is chosen by `VoiceFactory` on whether the weights are present, so
+installing them later upgrades her with no code change.
 
 **3. `RemoteVoice` — hosted API.** Best quality available, but it sends text off
 the machine. Opt-in, off by default, and never the automatic fallback.

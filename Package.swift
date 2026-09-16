@@ -41,6 +41,11 @@ let package = Package(
         // open-source surface. (Argmax's paid tier buys low-latency STREAMING
         // transcription, which push-to-talk does not need.)
         .package(url: "https://github.com/argmaxinc/WhisperKit", from: "0.9.0"),
+
+        // Local neural TTS. Apache 2.0, model and code both. 82M parameters and
+        // it runs on the Neural Engine, so it barely contends with the language
+        // model holding the GPU.
+        .package(url: "https://github.com/mweinbach/kokoro-swift", from: "0.1.0"),
     ],
     targets: [
         // Domain vocabulary. Depends on nothing. Everything depends on it.
@@ -87,6 +92,7 @@ let package = Package(
         .target(name: "AURAVoice", dependencies: [
             "AURACore",
             .product(name: "WhisperKit", package: "WhisperKit"),
+            .product(name: "Kokoro", package: "kokoro-swift"),
         ]),
 
         // The companion: mood state machine, sprite renderer, Live2D seam.

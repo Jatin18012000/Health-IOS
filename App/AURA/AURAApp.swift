@@ -203,7 +203,8 @@ final class AppContainer {
     /// `@ObservationIgnored` because they are dependencies, not UI state — and
     /// because `lazy` does not survive the `@Observable` macro's rewrite of
     /// stored properties.
-    @ObservationIgnored let voice: any VoiceEngine = VoiceFactory.speech()
+    @ObservationIgnored let voice: any VoiceEngine =
+        VoiceFactory.speech(modelDirectory: AppContainer.folder.appending(path: "voice"))
     @ObservationIgnored let transcriber: any TranscriptionEngine = VoiceFactory.transcription()
     @ObservationIgnored let languageModel: any LanguageModel = ModelFactory.local()
 

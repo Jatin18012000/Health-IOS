@@ -80,8 +80,20 @@ public extension TranscriptionEngine {
 /// conditional written up there is always false.
 public enum VoiceFactory {
 
-    public static func speech() -> any VoiceEngine {
-        SystemVoice()
+    /// The best voice this build and this machine can manage.
+    ///
+    /// Neural when its weights are present, the system voice otherwise. The app
+    /// never learns which it got — that is the point of the protocol, and it
+    /// means installing the weights later upgrades her without a code change.
+    public static func speech(modelDirectory: URL? = nil) -> any VoiceEngine {
+        #if canImport(Kokoro)
+        if let modelDirectory,
+           FileManager.default.fileExists(
+               atPath: modelDirectory.appending(path: "config.json").path) {
+            return NeuralVoice(modelDirectory: modelDirectory)
+        }
+        #endif
+        return SystemVoice()
     }
 
     public static func transcription() -> any TranscriptionEngine {
