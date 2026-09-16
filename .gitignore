@@ -20,6 +20,24 @@ export_cda.xml
 apple_health_export/
 /Fixtures/real/
 
+# ...except the edge-case fixture, which is not health data. It is 10 KB of
+# hand-written records — sources called "Test Apple Watch" and "RandomBand",
+# each one commented with the case it exercises — and it is the *input* that
+# `expected.json` describes.
+#
+# `export.xml` above has no leading slash, so git matches it at any depth. It
+# was written to stop a 300 MB real export landing at the repo root and it
+# also silently swallowed this. The result: a fresh clone could not run
+# `tools/conformance.py` or `Tests/AURAIngestTests/ConformanceTests.swift` at
+# all, so the guarantee that the Python and the Swift cannot drift apart held
+# only on the one machine that happened to have the file. CI caught it on its
+# first run.
+#
+# The pattern above stays unanchored on purpose — a real export dropped
+# anywhere in the tree should still be refused — and this one known-synthetic
+# file is re-included by name.
+!/Tests/Fixtures/edge-cases/export.xml
+
 # Model weights
 *.safetensors
 *.gguf

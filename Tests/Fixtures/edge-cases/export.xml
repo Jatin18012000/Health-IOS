@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE HealthData [
+<!-- HealthKit Export Version: 14 -->
+]>
+<HealthData locale="en_IN">
+ <ExportDate value="2025-03-12 09:00:00 +0530"/>
+ <Me HKCharacteristicTypeIdentifierDateOfBirth="2000-01-18" HKCharacteristicTypeIdentifierBiologicalSex="HKBiologicalSexMale" HKCharacteristicTypeIdentifierBloodType="HKBloodTypeNotSet" HKCharacteristicTypeIdentifierFitzpatrickSkinType="HKFitzpatrickSkinTypeNotSet" HKCharacteristicTypeIdentifierCardioFitnessMedicationsUse="None"/>
+
+ <!-- ══ DEDUP: full overlap. Watch outranks iPhone, so the iPhone's identical hour contributes nothing. ══ -->
+ <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" device="&lt;&lt;HKDevice: 0x1&gt;, name:Apple Watch&gt;" unit="count" creationDate="2025-03-10 11:00:00 +0530" startDate="2025-03-10 10:00:00 +0530" endDate="2025-03-10 11:00:00 +0530" value="600"/>
+ <Record type="HKQuantityTypeIdentifierStepCount" sourceName="iPhone" sourceVersion="18.0" unit="count" creationDate="2025-03-10 11:00:00 +0530" startDate="2025-03-10 10:00:00 +0530" endDate="2025-03-10 11:00:00 +0530" value="400"/>
+
+ <!-- ══ DEDUP: no overlap. The iPhone's own hour counts in full. ══ -->
+ <Record type="HKQuantityTypeIdentifierStepCount" sourceName="iPhone" sourceVersion="18.0" unit="count" creationDate="2025-03-10 12:00:00 +0530" startDate="2025-03-10 11:00:00 +0530" endDate="2025-03-10 12:00:00 +0530" value="300"/>
+
+ <!-- ══ DEDUP: half overlap. The iPhone contributes pro rata for its uncovered 30 minutes. ══ -->
+ <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" unit="count" creationDate="2025-03-10 15:00:00 +0530" startDate="2025-03-10 14:00:00 +0530" endDate="2025-03-10 15:00:00 +0530" value="500"/>
+ <Record type="HKQuantityTypeIdentifierStepCount" sourceName="iPhone" sourceVersion="18.0" unit="count" creationDate="2025-03-10 15:30:00 +0530" startDate="2025-03-10 14:30:00 +0530" endDate="2025-03-10 15:30:00 +0530" value="400"/>
+
+ <!-- ══ IDEMPOTENCY: a byte-identical repeat of the first record. Must store once. ══ -->
+ <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" device="&lt;&lt;HKDevice: 0x1&gt;, name:Apple Watch&gt;" unit="count" creationDate="2025-03-10 11:00:00 +0530" startDate="2025-03-10 10:00:00 +0530" endDate="2025-03-10 11:00:00 +0530" value="600"/>
+
+ <!-- ══ UNITS: "Cal" in a HealthKit export is a KILOcalorie. Reading it as a calorie is a silent 1000x error. ══ -->
+ <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="iPhone" sourceVersion="18.0" unit="Cal" creationDate="2025-03-10 10:00:00 +0530" startDate="2025-03-10 09:00:00 +0530" endDate="2025-03-10 10:00:00 +0530" value="250"/>
+ <Record type="HKQuantityTypeIdentifierBasalEnergyBurned" sourceName="iPhone" sourceVersion="18.0" unit="kcal" creationDate="2025-03-10 10:00:00 +0530" startDate="2025-03-10 09:00:00 +0530" endDate="2025-03-10 10:00:00 +0530" value="1000"/>
+
+ <!-- ══ UNITS: "count/min" means BEATS per minute here... ══ -->
+ <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" unit="count/min" creationDate="2025-03-10 08:00:00 +0530" startDate="2025-03-10 08:00:00 +0530" endDate="2025-03-10 08:00:00 +0530" value="60"/>
+ <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" unit="count/min" creationDate="2025-03-10 12:00:00 +0530" startDate="2025-03-10 12:00:00 +0530" endDate="2025-03-10 12:00:00 +0530" value="120"/>
+ <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" unit="count/min" creationDate="2025-03-10 20:00:00 +0530" startDate="2025-03-10 20:00:00 +0530" endDate="2025-03-10 20:00:00 +0530" value="90"/>
+
+ <!-- ══ ...and BREATHS per minute here. One global alias table maps one of these wrong. ══ -->
+ <Record type="HKQuantityTypeIdentifierRespiratoryRate" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" unit="count/min" creationDate="2025-03-10 03:00:00 +0530" startDate="2025-03-10 03:00:00 +0530" endDate="2025-03-10 03:00:00 +0530" value="16"/>
+ <Record type="HKQuantityTypeIdentifierRespiratoryRate" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" unit="count/min" creationDate="2025-03-10 04:00:00 +0530" startDate="2025-03-10 04:00:00 +0530" endDate="2025-03-10 04:00:00 +0530" value="18"/>
+
+ <!-- ══ UNITS: a US-locale export emits miles. Reject loudly; never assume a conversion. ══ -->
+ <Record type="HKQuantityTypeIdentifierDistanceWalkingRunning" sourceName="iPhone" sourceVersion="18.0" unit="mi" creationDate="2025-03-10 11:00:00 +0530" startDate="2025-03-10 10:00:00 +0530" endDate="2025-03-10 11:00:00 +0530" value="2.0"/>
+
+ <!-- ══ AGGREGATION: `last` wins for body mass, not the mean of the two. ══ -->
+ <Record type="HKQuantityTypeIdentifierBodyMass" sourceName="Health" sourceVersion="18.0" unit="kg" creationDate="2025-03-10 08:00:00 +0530" startDate="2025-03-10 08:00:00 +0530" endDate="2025-03-10 08:00:00 +0530" value="70"/>
+ <Record type="HKQuantityTypeIdentifierBodyMass" sourceName="Health" sourceVersion="18.0" unit="kg" creationDate="2025-03-10 19:00:00 +0530" startDate="2025-03-10 19:00:00 +0530" endDate="2025-03-10 19:00:00 +0530" value="72"/>
+
+ <!-- ══ AGGREGATION: stand hours count only the hours actually stood. ══ -->
+ <Record type="HKCategoryTypeIdentifierAppleStandHour" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" creationDate="2025-03-10 10:00:00 +0530" startDate="2025-03-10 09:00:00 +0530" endDate="2025-03-10 10:00:00 +0530" value="HKCategoryValueAppleStandHourStood"/>
+ <Record type="HKCategoryTypeIdentifierAppleStandHour" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" creationDate="2025-03-10 11:00:00 +0530" startDate="2025-03-10 10:00:00 +0530" endDate="2025-03-10 11:00:00 +0530" value="HKCategoryValueAppleStandHourIdle"/>
+ <Record type="HKCategoryTypeIdentifierAppleStandHour" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" creationDate="2025-03-10 12:00:00 +0530" startDate="2025-03-10 11:00:00 +0530" endDate="2025-03-10 12:00:00 +0530" value="HKCategoryValueAppleStandHourStood"/>
+
+ <!-- ══ UNKNOWN TYPE: counted as an issue, never silently dropped. ══ -->
+ <Record type="HKQuantityTypeIdentifierBloodGlucose" sourceName="iPhone" sourceVersion="18.0" unit="mg/dL" creationDate="2025-03-10 09:00:00 +0530" startDate="2025-03-10 09:00:00 +0530" endDate="2025-03-10 09:00:00 +0530" value="95"/>
+
+ <!-- ══ SLEEP: a staged night. Ends before 18:00 on the 11th, so it belongs to the night of the 10th.
+        The InBed interval CONTAINS every stage — union the intervals, never add them. ══ -->
+ <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" creationDate="2025-03-11 07:00:00 +0530" startDate="2025-03-10 23:00:00 +0530" endDate="2025-03-11 07:00:00 +0530" value="HKCategoryValueSleepAnalysisInBed"/>
+ <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" creationDate="2025-03-11 07:00:00 +0530" startDate="2025-03-10 23:30:00 +0530" endDate="2025-03-11 02:00:00 +0530" value="HKCategoryValueSleepAnalysisAsleepCore"/>
+ <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" creationDate="2025-03-11 07:00:00 +0530" startDate="2025-03-11 02:00:00 +0530" endDate="2025-03-11 03:00:00 +0530" value="HKCategoryValueSleepAnalysisAsleepDeep"/>
+ <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" creationDate="2025-03-11 07:00:00 +0530" startDate="2025-03-11 03:00:00 +0530" endDate="2025-03-11 04:30:00 +0530" value="HKCategoryValueSleepAnalysisAsleepREM"/>
+ <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" creationDate="2025-03-11 07:00:00 +0530" startDate="2025-03-11 04:30:00 +0530" endDate="2025-03-11 04:45:00 +0530" value="HKCategoryValueSleepAnalysisAwake"/>
+ <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" creationDate="2025-03-11 07:00:00 +0530" startDate="2025-03-11 04:45:00 +0530" endDate="2025-03-11 06:50:00 +0530" value="HKCategoryValueSleepAnalysisAsleepCore"/>
+
+ <!-- ══ SLEEP: the other era. In-bed intervals only, no staging — not comparable to the night above. ══ -->
+ <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="iPhone" sourceVersion="18.0" creationDate="2025-03-12 06:00:00 +0530" startDate="2025-03-11 22:00:00 +0530" endDate="2025-03-12 06:00:00 +0530" value="HKCategoryValueSleepAnalysisInBed"/>
+ <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="iPhone" sourceVersion="18.0" creationDate="2025-03-12 06:40:00 +0530" startDate="2025-03-12 06:10:00 +0530" endDate="2025-03-12 06:40:00 +0530" value="HKCategoryValueSleepAnalysisInBed"/>
+
+ <!-- ══ DEDUP: instantaneous cumulative samples at the same instant. Higher trust takes it whole. ══ -->
+ <Record type="HKQuantityTypeIdentifierFlightsClimbed" sourceName="Test&#160;Apple&#160;Watch" sourceVersion="10.0" unit="count" creationDate="2025-03-11 09:00:00 +0530" startDate="2025-03-11 09:00:00 +0530" endDate="2025-03-11 09:00:00 +0530" value="5"/>
+ <Record type="HKQuantityTypeIdentifierFlightsClimbed" sourceName="iPhone" sourceVersion="18.0" unit="count" creationDate="2025-03-11 09:00:00 +0530" startDate="2025-03-11 09:00:00 +0530" endDate="2025-03-11 09:00:00 +0530" value="3"/>
+
+ <!-- ══ UNKNOWN SOURCE: sorts last, but is still counted — a new device degrades, it does not vanish. ══ -->
+ <Record type="HKQuantityTypeIdentifierStepCount" sourceName="RandomBand" sourceVersion="1.0" unit="count" creationDate="2025-03-11 11:00:00 +0530" startDate="2025-03-11 10:00:00 +0530" endDate="2025-03-11 11:00:00 +0530" value="250"/>
+
+ <!-- ══ MISSING endDate: falls back to startDate rather than failing the record. ══ -->
+ <Record type="HKQuantityTypeIdentifierTimeInDaylight" sourceName="iPhone" sourceVersion="18.0" unit="min" creationDate="2025-03-11 12:00:00 +0530" startDate="2025-03-11 12:00:00 +0530" value="30"/>
+</HealthData>
