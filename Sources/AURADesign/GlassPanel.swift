@@ -143,3 +143,32 @@ public struct ProvenanceBadge: View {
         }
     }
 }
+
+/// The soft coloured glow behind a full screen.
+///
+/// Lives here rather than in one view because every full-screen surface — the
+/// dashboard, the importer, anything added later — needs the same background,
+/// and two copies of it drift the moment a theme changes.
+public struct AmbientField: View {
+    @Environment(\.theme) private var theme
+
+    public init() {}
+
+    public var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                Circle()
+                    .fill(RadialGradient(colors: [theme.primary.opacity(0.20), .clear],
+                                         center: .center, startRadius: 0, endRadius: 350))
+                    .frame(width: 700, height: 700)
+                    .position(x: geo.size.width * 0.42, y: -60)
+                Circle()
+                    .fill(RadialGradient(colors: [theme.secondary.opacity(0.12), .clear],
+                                         center: .center, startRadius: 0, endRadius: 310))
+                    .frame(width: 620, height: 620)
+                    .position(x: geo.size.width * 0.85, y: geo.size.height + 80)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}

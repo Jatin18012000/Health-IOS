@@ -166,7 +166,7 @@ public struct Live2DStageView: NSViewRepresentable {
 }
 #endif
 
-public enum CharacterError: Error, Sendable {
+public enum CharacterError: Error, Sendable, LocalizedError {
     case modelUnreadable(URL)
     /// The rig is missing a parameter the renderer drives.
     ///
@@ -174,4 +174,13 @@ public enum CharacterError: Error, Sendable {
     /// delivered without a usable `ParamMouthOpenY` is the single most likely
     /// thing to be wrong with a commission, and the one hardest to notice.
     case missingParameter(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .modelUnreadable(let url):
+            "no readable Cubism model in \(url.lastPathComponent)"
+        case .missingParameter(let name):
+            "the rig has no \(name) parameter"
+        }
+    }
 }

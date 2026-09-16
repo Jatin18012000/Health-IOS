@@ -12,8 +12,23 @@ public struct DashboardView: View {
     @Environment(\.theme) private var theme
     @State private var model: DashboardViewModel
 
-    public init(model: DashboardViewModel) {
+    /// Set when the shell has somewhere to send an empty dashboard. An empty
+    /// state that names the fix and can't perform it is a dead end.
+    private let onImport: (() -> Void)?
+
+    /// Which renderer the character stage should use. `.placeholder` until a
+    /// rig is installed, which is most of this project's life.
+    private let characterManifest: CharacterManifest
+    private let rigDirectory: URL?
+
+    public init(model: DashboardViewModel,
+                onImport: (() -> Void)? = nil,
+                characterManifest: CharacterManifest = .placeholder,
+                rigDirectory: URL? = nil) {
         _model = State(wrappedValue: model)
+        self.onImport = onImport
+        self.characterManifest = characterManifest
+        self.rigDirectory = rigDirectory
     }
 
     public var body: some View {
@@ -36,6 +51,16 @@ public struct DashboardView: View {
                         .foregroundStyle(theme.textSecondary)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 320)
+
+                    if case .empty = model.state, let onImport {
+                        Button("Import an export…", action: onImport)
+                            .buttonStyle(.plain)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(theme.primary)
+                            .padding(.horizontal, 16).padding(.vertical, 7)
+                            .background(Capsule().fill(theme.primary.opacity(0.14)))
+                            .padding(.top, 4)
+                    }
                 }
 
             case .ready:
@@ -185,7 +210,9 @@ public struct DashboardView: View {
 
     private var centreColumn: some View {
         VStack(spacing: 14) {
-            CharacterStageView(state: .idle, mood: mood)
+            CharacterStageView(state: .idle, mood: mood,
+                               manifest: characterManifest,
+                               rigDirectory: rigDirectory)
                 .frame(maxHeight: .infinity)
             scorePanel
         }
@@ -425,28 +452,5 @@ private struct ScoreRow: View {
         case 40..<60: return theme.dataSeries[4]
         default:      return theme.accent
         }
-    }
-}
-
-/// The soft coloured glow behind everything.
-private struct AmbientField: View {
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                Circle()
-                    .fill(RadialGradient(colors: [theme.primary.opacity(0.20), .clear],
-                                         center: .center, startRadius: 0, endRadius: 350))
-                    .frame(width: 700, height: 700)
-                    .position(x: geo.size.width * 0.42, y: -60)
-                Circle()
-                    .fill(RadialGradient(colors: [theme.secondary.opacity(0.12), .clear],
-                                         center: .center, startRadius: 0, endRadius: 310))
-                    .frame(width: 620, height: 620)
-                    .position(x: geo.size.width * 0.85, y: geo.size.height + 80)
-            }
-        }
-        .allowsHitTesting(false)
     }
 }

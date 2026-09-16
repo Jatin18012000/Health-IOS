@@ -30,11 +30,65 @@ public actor ImportSession {
         case failed(String)
     }
 
-    private let store: any HealthStore
+    private let store: SQLiteHealthStore
     public private(set) var state: State = .idle
 
-    public init(store: any HealthStore) {
+    /// Concrete rather than `any HealthStore`: the import needs the
+    /// synchronous write path, which only makes sense for a real store.
+    public init(store: SQLiteHealthStore) {
         self.store = store
+    }
+
+    public enum SessionError: Error, Sendable, LocalizedError {
+        case noExportFound(URL)
+
+        public var errorDescription: String? {
+            switch self {
+            case .noExportFound(let url):
+                """
+                No export.xml inside “\(url.lastPathComponent)”. On your iPhone: \
+                Health → your profile picture → Export All Health Data.
+                """
+            }
+        }
+    }
+
+    /// Resolve whatever was handed over to the `export.xml` inside it.
+    ///
+    /// Asks the filesystem rather than reading `hasDirectoryPath`, which is a
+    /// trailing-slash heuristic: a directory URL built with `appending(path:)`
+    /// reports false, and the import would then try to parse the folder itself.
+    ///
+    /// Looks at the top level and one level down, the latter because both the
+    /// archive and the folder wrap everything in `apple_health_export/`.
+    /// Deliberately not a recursive walk — descending a whole home directory
+    /// looking for a file is not a file picker's job.
+    public static func locateExportXML(in url: URL) throws -> URL {
+        var isDirectory: ObjCBool = false
+        FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+        guard isDirectory.boolValue else { return url }
+
+        let direct = url.appending(path: "export.xml")
+        if FileManager.default.isReadableFile(atPath: direct.path) { return direct }
+
+        let children = (try? FileManager.default.contentsOfDirectory(
+            at: url, includingPropertiesForKeys: nil)) ?? []
+        for child in children {
+            let nested = child.appending(path: "export.xml")
+            if FileManager.default.isReadableFile(atPath: nested.path) { return nested }
+        }
+        throw SessionError.noExportFound(url)
+    }
+
+    /// Running counts, accumulated inside the parse.
+    private final class Tally: @unchecked Sendable {
+        var parsed = 0
+        var stored = 0
+        var duplicates = 0
+        var failedBatches = 0
+        var rejected: [String: Int] = [:]
+        var lo: CalendarDay?
+        var hi: CalendarDay?
     }
 
     /// Import an unzipped `apple_health_export` directory, or an `export.xml`
@@ -44,38 +98,49 @@ public actor ImportSession {
         onState: @escaping @Sendable (State) -> Void = { _ in }
     ) async throws -> Outcome {
         let started = Date()
-        let xml = url.hasDirectoryPath ? url.appending(path: "export.xml") : url
+        let xml = try Self.locateExportXML(in: url)
 
         let importer = AppleHealthImporter()
-        var parsed = 0
-        var stored = 0
-        var duplicates = 0
-        var rejected: [String: Int] = [:]
-        var lo: CalendarDay?
-        var hi: CalendarDay?
+        let store = self.store
 
-        // The parse is synchronous and CPU-bound; keep it off the main actor so
-        // a 293 MB file never blocks a frame.
-        let batches = try await Task.detached(priority: .userInitiated) { () -> [[Sample]] in
-            var collected: [[Sample]] = []
+        // The store is written from INSIDE the parse, batch by batch. An
+        // earlier version collected every batch into an array first, which held
+        // all 664,515 samples in memory at once and defeated the entire reason
+        // the importer batches at all.
+        //
+        // The counters are a class rather than locals because the sink is an
+        // escaping closure; the parse is single-threaded, so no lock is needed.
+        let tally = Tally()
+
+        try await Task.detached(priority: .userInitiated) {
             try importer.importExport(at: xml, onProgress: { progress in
                 onState(.parsing(fraction: progress.fraction, records: progress.recordsSeen))
             }, sink: { batch in
-                collected.append(batch)
+                tally.parsed += batch.count
+                guard let result = try? store.ingestSynchronously(batch) else {
+                    tally.failedBatches += 1
+                    return
+                }
+                tally.stored += result.inserted
+                tally.duplicates += result.duplicates
+                for (key, count) in result.rejected {
+                    tally.rejected[key, default: 0] += count
+                }
+                if let affected = result.affected {
+                    tally.lo = Swift.min(tally.lo ?? affected.start, affected.start)
+                    tally.hi = Swift.max(tally.hi ?? affected.end, affected.end)
+                }
             })
-            return collected
         }.value
 
-        for batch in batches {
-            parsed += batch.count
-            let result = try await store.ingest(batch)
-            stored += result.inserted
-            duplicates += result.duplicates
-            for (key, count) in result.rejected { rejected[key, default: 0] += count }
-            if let affected = result.affected {
-                lo = min(lo ?? affected.start, affected.start)
-                hi = max(hi ?? affected.end, affected.end)
-            }
+        let parsed = tally.parsed
+        let stored = tally.stored
+        let duplicates = tally.duplicates
+        var rejected = tally.rejected
+        let lo = tally.lo
+        let hi = tally.hi
+        if tally.failedBatches > 0 {
+            rejected["batch_write_failed", default: 0] += tally.failedBatches
         }
 
         for (key, count) in importer.issues { rejected[key, default: 0] += count }

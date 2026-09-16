@@ -3,6 +3,7 @@ import Observation
 import AURACore
 import AURAAnalytics
 import AURAIntelligence
+import AURAMemory
 import AURAVoice
 import AURACharacter
 
@@ -62,15 +63,35 @@ public final class ConversationViewModel {
     private let day: CalendarDay
     private var task: Task<Void, Never>?
 
+    /// Where the transcript is written, and what reads it afterwards.
+    ///
+    /// Both optional: memory failing to open must not take the conversation
+    /// with it. Without them she still answers — she just does not remember
+    /// having done so.
+    private let memory: MemoryStore?
+    private let keeper: MemoryKeeper?
+    /// Created on the first turn, not on the first appearance of the screen.
+    /// Opening the Companion tab and closing it again is not a conversation,
+    /// and a store full of empty ones makes `recentConversations` useless.
+    private var storedConversationID: UUID?
+    /// The one task that creates the conversation row. See `record`.
+    private var conversationSetup: Task<UUID?, Never>?
+    /// Tail of the chain of transcript writes, so they land in order.
+    private var pendingWrite: Task<Void, Never>?
+
     public init(model: any LanguageModel,
                 briefBuilder: BriefBuilder,
                 voice: any VoiceEngine,
                 transcriber: any TranscriptionEngine,
-                day: CalendarDay) {
+                day: CalendarDay,
+                memory: MemoryStore? = nil,
+                keeper: MemoryKeeper? = nil) {
         self.conversation = Conversation(model: model, briefBuilder: briefBuilder)
         self.voice = voice
         self.transcriber = transcriber
         self.day = day
+        self.memory = memory
+        self.keeper = keeper
         if !model.isReady, let unavailable = model as? UnavailableModel {
             self.status = .unavailable(unavailable.reason)
         }
@@ -90,6 +111,7 @@ public final class ConversationViewModel {
         turns.append(Turn(speaker: .aura, text: "", isStreaming: true))
         status = .thinking
         characterState = .thinking
+        record(.you, question)
 
         task = Task { [weak self] in
             guard let self else { return }
@@ -228,9 +250,77 @@ public final class ConversationViewModel {
         turns[index].isStreaming = false
         // An answer that produced nothing at all is removed rather than left as
         // an empty bubble.
-        if turns[index].text.isEmpty { turns.remove(at: index) }
+        if turns[index].text.isEmpty {
+            turns.remove(at: index)
+        } else {
+            // Recorded only once it is finished. Storing it sentence by
+            // sentence would leave a half-answer in memory if she is
+            // interrupted, and a half-answer is a thing she never actually
+            // said.
+            record(.aura, turns[index].text)
+        }
         characterState = .idle
     }
+
+    // MARK: Memory
+
+    /// Append one turn to the stored transcript, starting a conversation row if
+    /// this is the first.
+    private func record(_ speaker: StoredTurn.Speaker, _ text: String) {
+        guard let memory else { return }
+
+        // The conversation row is created exactly once, by a task stored
+        // synchronously here and awaited by every later turn. Checking for an
+        // existing id and then awaiting the insert would let two turns recorded
+        // in quick succession each find none and start one, splitting the
+        // transcript across two conversations.
+        let setup: Task<UUID?, Never>
+        if let existing = conversationSetup {
+            setup = existing
+        } else {
+            setup = Task { try? await memory.startConversation().id }
+            conversationSetup = setup
+        }
+
+        // Stamped now, not when the write lands: `turns(in:)` orders by this.
+        let at = Date()
+
+        // Chained, so the writes are serial and `endConversation` has one thing
+        // to wait on. Without the chain, proposing facts could read a
+        // transcript whose last turn had not landed yet.
+        let previous = pendingWrite
+        pendingWrite = Task {
+            await previous?.value
+            guard let id = await setup.value else { return }
+            storedConversationID = id
+            try? await memory.append(StoredTurn(
+                conversationID: id, speaker: speaker, text: text, at: at))
+        }
+    }
+
+    /// Close the current conversation and read it for things worth remembering.
+    ///
+    /// Everything this produces is a **proposal** waiting in the Memory screen.
+    /// Nothing reaches a brief until it is confirmed there, which is the point:
+    /// a companion that quietly accumulates conclusions about you is
+    /// unsettling, and one that asks is not.
+    public func endConversation() async {
+        // Awaited rather than read straight off `storedConversationID`: the
+        // last turn's write may still be in flight, and proposing facts from a
+        // transcript missing its final turn is worse than waiting a moment.
+        await pendingWrite?.value
+        let id = await conversationSetup?.value
+        pendingWrite = nil
+        conversationSetup = nil
+        storedConversationID = nil
+        turns.removeAll()
+        withheldCount = 0
+        guard let id else { return }
+        _ = await keeper?.proposeFacts(from: id)
+    }
+
+    /// True when there is a conversation worth closing.
+    public var hasTranscript: Bool { !turns.isEmpty }
 
     private func speak(_ sentence: String) {
         Task { [voice] in

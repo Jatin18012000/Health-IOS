@@ -29,6 +29,16 @@ public protocol VoiceEngine: AnyObject, Sendable {
     func stop()
 
     var isSpeaking: Bool { get }
+
+    /// For display only — the Settings screen, and nothing else.
+    ///
+    /// Nothing in the app may branch on this. The whole point of the protocol
+    /// is that installing the neural weights later upgrades her without a code
+    /// change, and a `if identifier == ...` anywhere would quietly undo that.
+    /// Naming which voice is speaking is still worth doing: "neural" and "the
+    /// system voice" sound different enough that being unable to tell which one
+    /// you have is a real question with no answer on screen.
+    var identifier: String { get }
 }
 
 /// Speech-to-text, so she can be talked to rather than only typed at.

@@ -29,18 +29,36 @@ public enum Backup {
         public let formatVersion: Int
     }
 
-    enum BackupError: Error, Sendable {
+    /// Public, and `LocalizedError`, because these are read by the person
+    /// doing the backup. An internal error type thrown out of a public function
+    /// reaches the UI as "The operation couldn't be completed", which on a
+    /// wrong passphrase is precisely the case where saying nothing useful is
+    /// worst.
+    public enum BackupError: Error, Sendable, LocalizedError {
         case passphraseTooShort
         case notABackup
         case wrongPassphrase
         case corrupt(String)
+
+        public var errorDescription: String? {
+            switch self {
+            case .passphraseTooShort:
+                "Use at least \(Backup.minimumPassphrase) characters. A short passphrase is the weakest part of an encrypted file by a wide margin."
+            case .notABackup:
+                "That isn't an AURA backup."
+            case .wrongPassphrase:
+                "Wrong passphrase — or the file has been altered since it was written. Encryption can't tell those apart, and both mean don't trust it."
+            case .corrupt(let detail):
+                "The backup is unreadable: \(detail)"
+            }
+        }
     }
 
     /// Minimum passphrase length.
     ///
     /// Not security theatre: a short passphrase on an AES-GCM file is the
     /// weakest link by a wide margin, and the only defence is refusing it.
-    static let minimumPassphrase = 12
+    public static let minimumPassphrase = 12
 
     /// Write an encrypted archive of both databases.
     ///

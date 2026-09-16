@@ -9,10 +9,14 @@ One-time setup, once you're on the Mac:
 
 1. Xcode → New Project → macOS → App, named `AURA`, at `App/AURA/`.
 2. File → Add Package Dependencies → Add Local → choose the repository root.
-3. Link `AURACore`, `AURAStore`, `AURAAnalytics`, `AURAIntelligence`,
-   `AURAVoice`, `AURACharacter`, `AURADesign`.
+3. Link `AURACore`, `AURAStore`, `AURAIngest`, `AURAAnalytics`,
+   `AURAIntelligence`, `AURAMemory`, `AURAReport`, `AURAVoice`,
+   `AURACharacter`, `AURADesign` — every package. The shell reaches all of
+   them now that Settings carries the report and the backup.
 4. Signing & Capabilities → App Sandbox → enable **Audio Input** and
-   **User Selected File** read access (so the import can read the export).
+   **User Selected File** read access. The import screen needs the latter for
+   both the file panel and the drop target; without it a dropped folder reads
+   as empty rather than as denied, which looks like a broken importer.
 5. Add **`NSMicrophoneUsageDescription`** to Info.plist. Without it the app
    does not prompt for the microphone — it crashes the moment the audio engine
    starts, which looks like a bug in the talk button rather than a missing key.
@@ -25,3 +29,24 @@ companion can link the same packages.
 
 Keep this target thin: views and view models only. Anything with logic worth
 testing belongs in a package.
+
+## What lives where at runtime
+
+Everything is under `~/Library/Application Support/AURA/`:
+
+| Path | What |
+|---|---|
+| `aura.sqlite` | the health data, plus its `-wal` and `-shm` sidecars |
+| `memory.sqlite` | facts, annotations and conversation transcripts |
+| `voice/` | Kokoro weights, if installed; absent means the system voice |
+| `character/` | `manifest.json` and a rig, if there is one |
+| `restore-pending/` | a restored backup waiting for the next launch |
+
+`restore-pending/` is the one that needs explaining. Both databases are open
+with WAL journaling while the app runs, and writing over `aura.sqlite`
+underneath an open connection corrupts it *silently* — it opens fine afterwards
+and is simply wrong. So a restore stages the files here and `AppContainer.open()`
+moves them into place before it opens anything, deleting the old `-wal` and
+`-shm` as it goes. Leaving those behind would let SQLite replay the previous
+write-ahead log over the restored database, which is the same corruption by a
+longer route.

@@ -15,8 +15,15 @@ public struct ConversationView: View {
     @State private var model: ConversationViewModel
     @FocusState private var inputFocused: Bool
 
-    public init(model: ConversationViewModel) {
+    private let manifest: CharacterManifest
+    private let rigDirectory: URL?
+
+    public init(model: ConversationViewModel,
+                manifest: CharacterManifest = .placeholder,
+                rigDirectory: URL? = nil) {
         _model = State(wrappedValue: model)
+        self.manifest = manifest
+        self.rigDirectory = rigDirectory
     }
 
     public var body: some View {
@@ -37,7 +44,8 @@ public struct ConversationView: View {
     // MARK: Stage
 
     private var stage: some View {
-        CharacterStageView(state: model.characterState, mood: .calm)
+        CharacterStageView(state: model.characterState, mood: .calm,
+                           manifest: manifest, rigDirectory: rigDirectory)
             .overlay(alignment: .top) {
                 HStack {
                     Spacer()
@@ -103,11 +111,37 @@ public struct ConversationView: View {
                     .foregroundStyle(theme.textSecondary)
             }
             Spacer()
+            if model.hasTranscript { endButton }
             // Stated plainly, because it is the reason the project exists.
             capsule("No network", tint: theme.dataSeries[3])
         }
         .padding(.horizontal, 30)
         .padding(.vertical, 22)
+    }
+
+    /// Ends the conversation, which is also what makes her read it.
+    ///
+    /// Anything she takes from it is a **proposal** waiting in Memory, not
+    /// something she now believes. A companion that quietly accumulates
+    /// conclusions about you is unsettling; one that asks is not — and that is
+    /// the whole reason nothing here reaches a brief unconfirmed.
+    private var endButton: some View {
+        Button {
+            Task { await model.endConversation() }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.bubble").font(.system(size: 10))
+                Text("End & remember")
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(theme.primary)
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(Capsule().fill(theme.primary.opacity(0.14)))
+        }
+        .buttonStyle(.plain)
+        .disabled(model.isBusy)
+        .opacity(model.isBusy ? 0.45 : 1)
+        .help("Close this conversation so she can read it for anything worth remembering.")
     }
 
     private func notice(_ text: String, tint: Color) -> some View {

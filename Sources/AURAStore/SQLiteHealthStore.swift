@@ -118,6 +118,23 @@ public final class SQLiteHealthStore: HealthStore {
     // MARK: - Writes
 
     public func ingest(_ batch: [Sample]) async throws -> IngestResult {
+        try await dbQueue.write { db in try self.ingest(batch, into: db) }
+    }
+
+    /// Synchronous ingest, for the import path.
+    ///
+    /// Exists because the importer is a synchronous SAX parse and the whole
+    /// point of its batching is that memory stays flat. Bridging each batch
+    /// into an async write means either collecting them all first — which
+    /// defeats the batching entirely — or blocking a thread on a semaphore.
+    /// A synchronous write is the honest version: the parse and the store run
+    /// on the same background thread, and the store provides natural
+    /// backpressure by simply taking as long as it takes.
+    public func ingestSynchronously(_ batch: [Sample]) throws -> IngestResult {
+        try dbQueue.write { db in try self.ingest(batch, into: db) }
+    }
+
+    private func ingest(_ batch: [Sample], into db: Database) throws -> IngestResult {
         guard !batch.isEmpty else {
             return IngestResult(seen: 0, inserted: 0, duplicates: 0,
                                 rejected: [:], affected: nil)
@@ -139,7 +156,7 @@ public final class SQLiteHealthStore: HealthStore {
         var rejected: [String: Int] = [:]
         var inserted = 0
 
-        try await dbQueue.write { db in
+        do {
             let metricIDs = try Self.idMap(db, table: "metrics", column: "identifier")
 
             for sample in unique {

@@ -176,6 +176,28 @@ is worth more than any week of code.
 
 ---
 
+## 10. Unzipping the export
+
+The Health app gives you `export.zip`. AURA does not open it. Dropping one on
+the import screen gets a prompt and an **Expand it now** button that hands the
+file to Archive Utility — the same thing a double-click does — and then you
+drop the resulting folder.
+
+The two ways to do it in-app both cost something:
+
+| Option | Cost |
+|---|---|
+| A zip library (ZIPFoundation) | A dependency, and its supply chain, in an app whose premise is that it is small, local and auditable |
+| Shell out to `/usr/bin/ditto` | Requires turning **off** the App Sandbox, which is the thing keeping an app that reads four years of your health history away from the rest of your disk |
+| **Current: one double-click** | One extra click, once per export |
+
+Provisional answer: **keep the click.** Foundation has no zip reader, so there
+is no free third option. If you import often enough that the click grates, the
+library is the lesser of the two costs — the sandbox is worth more than the
+convenience.
+
+---
+
 ## Already decided (recorded so they don't get reopened)
 
 - **Local-only, no App Store** — `docs/COST.md`
@@ -189,3 +211,4 @@ is worth more than any week of code.
   measured, the index cost 21.9 MB to enforce what a probe does for free
 - **365-day percentile baseline** — §1 above
 - **8,000 step goal, kept out of the analytics** — §3 above
+- **Zip stays a double-click, sandbox stays on** — §10 above
