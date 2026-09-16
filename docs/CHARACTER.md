@@ -184,6 +184,11 @@ Then rigged with the standard Cubism parameters: `ParamAngleX/Y/Z`,
 `ParamMouthOpenY`, `ParamMouthForm`, `ParamBodyAngleX/Y/Z`, `ParamBreath`, plus
 physics groups for hair and ponytail.
 
+> **If you cannot draw**, neither route below applies as written. See
+> `docs/CHARACTER_PROBLEM.md`, which states the constraints, what the renderer
+> actually needs, and the options that require no illustration skill. This
+> section assumes an artist — you, or someone paid.
+
 ### Two routes
 
 **Commission it.** An artist separates the layers, paints the occluded regions
