@@ -1,0 +1,69 @@
+name: checks
+
+# The reference implementations in `tools/` are the spec: `reference_pipeline.py`
+# defines ingestion and `analytics.py` defines every computed figure. The Swift
+# in `Sources/` is a port of them. This workflow guards the Python half of that
+# arrangement on every push, which is the half that can run on a Linux runner.
+#
+# What it deliberately does NOT do is build the Swift. That needs a macOS
+# runner, and `swift build` is still the gate nothing here replaces — see
+# "Not covered" at the bottom of this file.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A second push supersedes the first: nobody needs the result of a commit
+  # that has already been replaced.
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: reference implementations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Matches the cloud session the tools were written and run in. They
+          # use nothing outside the standard library, so there is no install
+          # step and nothing to cache.
+          python-version: '3.11'
+
+      - name: Conformance — 81 checks against the edge-case fixture
+        # `Tests/Fixtures/edge-cases/expected.json` is the single definition of
+        # correct ingestion, asserted by this script and by
+        # Tests/AURAIngestTests/ConformanceTests.swift. Changing behaviour in
+        # one language only turns the other side red — that is the entire point
+        # of running this here.
+        run: python3 tools/conformance.py
+
+      - name: Output guard self-test — 13 cases
+        # Every numeral she says is cross-checked against the computed brief
+        # before anything is spoken. These cases are the fabricated figures that
+        # must not get through.
+        run: python3 tools/output_guard.py --self-test
+
+# ## Not covered
+#
+# **`swift build` / `swift test`.** Not a cost decision: this repository is
+# public, and GitHub Actions minutes are free for public repositories on every
+# runner type, macOS included. It is left out because no Swift in this project
+# has ever been compiled — there is no toolchain in the cloud session it was
+# written in — so a macOS job added today would go red on its first run with a
+# backlog of errors, which is a worse first signal than no signal. Add it once
+# `swift build` passes on a Mac; it is one job, and from then on it is the gate
+# this workflow cannot be.
+#
+# **`tools/golden.py check`.** It compares against `golden.json`, recorded from
+# the real 4-year export. Both the export and the snapshot are gitignored and
+# must stay that way — a year of someone's resting heart rate is their medical
+# information and a repository is forever. It runs on the Mac.
