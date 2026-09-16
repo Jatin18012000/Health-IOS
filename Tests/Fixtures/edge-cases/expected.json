@@ -1,0 +1,166 @@
+{
+  "_": "Hand-computed expectations for export.xml. Every number here was derived by hand from the fixture BEFORE the pipeline was run against it, then confirmed. The Swift store must reproduce all of it. Run: python3 tools/conformance.py",
+  "totals": {
+    "records_in_file": 32,
+    "duplicates_ignored": 1,
+    "samples_stored": 29,
+    "daily_metric_rows": 10,
+    "nights": 2,
+    "_why": "32 records, less 1 byte-identical repeat, less 2 rejected (1 unmapped type, 1 unknown unit) = 29."
+  },
+  "source_ranks": {
+    "Test Apple Watch": 0,
+    "iPhone": 1,
+    "Health": 99,
+    "RandomBand": 99,
+    "_why": "The Watch's name contains a NON-BREAKING SPACE, written in the fixture as &#160;. A parser that does not decode XML entities ranks it 99, which silently inverts every dedup result below. This is a real bug this fixture caught."
+  },
+  "daily_metrics": [
+    {
+      "day": "2025-03-10",
+      "metric": "ActiveEnergyBurned",
+      "unit": "kcal",
+      "value": 250.0,
+      "samples": 1,
+      "sources": 1,
+      "method": "sum",
+      "_why": "Emitted as unit=\"Cal\". In a HealthKit export that IS a kilocalorie. Treating it as a calorie is a silent 1000x error."
+    },
+    {
+      "day": "2025-03-10",
+      "metric": "BasalEnergyBurned",
+      "unit": "kcal",
+      "value": 1000.0,
+      "samples": 1,
+      "sources": 1,
+      "method": "sum",
+      "_why": "Emitted as kcal. Must land in the same unit as ActiveEnergyBurned above."
+    },
+    {
+      "day": "2025-03-10",
+      "metric": "HeartRate",
+      "unit": "bpm",
+      "value": 90.0,
+      "min": 60.0,
+      "max": 120.0,
+      "samples": 3,
+      "sources": 1,
+      "method": "minmax",
+      "_why": "count/min means BEATS per minute here. Mean kept plus the day's range."
+    },
+    {
+      "day": "2025-03-10",
+      "metric": "RespiratoryRate",
+      "unit": "breaths/min",
+      "value": 17.0,
+      "samples": 2,
+      "sources": 1,
+      "method": "mean",
+      "_why": "count/min means BREATHS per minute here. One global unit-alias table maps this or HeartRate wrong -- aliasing must be scoped per canonical unit."
+    },
+    {
+      "day": "2025-03-10",
+      "metric": "BodyMass",
+      "unit": "kg",
+      "value": 72.0,
+      "samples": 2,
+      "sources": 1,
+      "method": "last",
+      "_why": "Most recent sample wins (72 at 19:00), not the mean of 70 and 72."
+    },
+    {
+      "day": "2025-03-10",
+      "metric": "AppleStandHour",
+      "unit": "count",
+      "value": 2.0,
+      "samples": 3,
+      "sources": 1,
+      "method": "count/stood",
+      "_why": "Three samples, but only the two Stood ones count. Idle is not a stand hour."
+    },
+    {
+      "day": "2025-03-10",
+      "metric": "StepCount",
+      "unit": "count",
+      "value": 1600.0,
+      "samples": 5,
+      "sources": 2,
+      "method": "sum/deduped",
+      "_why": "600 (Watch 10-11, claimed whole) + 0 (iPhone 10-11, fully covered) + 300 (iPhone 11-12, uncovered) + 500 (Watch 14-15) + 200 (iPhone 14:30-15:30, half uncovered, pro rata). Naive sum would be 2200."
+    },
+    {
+      "day": "2025-03-11",
+      "metric": "FlightsClimbed",
+      "unit": "count",
+      "value": 5.0,
+      "samples": 2,
+      "sources": 2,
+      "method": "sum/deduped",
+      "_why": "Two INSTANTANEOUS samples at the same instant. The higher-trust source takes it whole; the other adds nothing. Not 8."
+    },
+    {
+      "day": "2025-03-11",
+      "metric": "StepCount",
+      "unit": "count",
+      "value": 250.0,
+      "samples": 1,
+      "sources": 1,
+      "method": "sum",
+      "_why": "An unrecognised source still counts -- a new device degrades to least-trusted, it does not vanish from the data."
+    },
+    {
+      "day": "2025-03-11",
+      "metric": "TimeInDaylight",
+      "unit": "min",
+      "value": 30.0,
+      "samples": 1,
+      "sources": 1,
+      "method": "sum",
+      "_why": "This record has NO endDate. It must fall back to startDate rather than failing."
+    }
+  ],
+  "absent_metrics": [
+    {
+      "day": "2025-03-10",
+      "metric": "DistanceWalkingRunning",
+      "_why": "Emitted in miles by a US-locale export. Must be REJECTED and reported, never silently converted or assumed to be km."
+    }
+  ],
+  "sleep_nights": [
+    {
+      "night_of": "2025-03-10",
+      "in_bed_min": 480.0,
+      "asleep_min": 425.0,
+      "core_min": 275.0,
+      "deep_min": 60.0,
+      "rem_min": 90.0,
+      "awake_min": 15.0,
+      "efficiency": 88.5,
+      "staged": 1,
+      "_why": "Session ends 07:00 on the 11th -- before the 18:00 cutoff -- so it belongs to the night of the 10th. in_bed is the UNION of overlapping intervals (480), not their sum (920): the InBed interval contains every stage. asleep = 275 core + 60 deep + 90 rem."
+    },
+    {
+      "night_of": "2025-03-11",
+      "in_bed_min": 510.0,
+      "asleep_min": 510.0,
+      "core_min": 0.0,
+      "deep_min": 0.0,
+      "rem_min": 0.0,
+      "awake_min": 0.0,
+      "efficiency": 100.0,
+      "staged": 0,
+      "_why": "The other era: in-bed intervals only, no staging. 480 + 30 across two separate blocks. staged=0 must be recorded so this night is never averaged together with the one above."
+    }
+  ],
+  "issues": {
+    "unmapped:BloodGlucose": 1,
+    "unit_mismatch:DistanceWalkingRunning:got=mi:want=km": 1,
+    "_why": "Both are surfaced and counted. An import that silently drops 3% of a person's data is worse than one that fails."
+  },
+  "idempotency": {
+    "_why": "Every Apple Health export contains ALL history, so the second import is almost entirely records already stored. Importing the fixture twice must leave every table byte-identical.",
+    "samples_after_second_import": 29,
+    "daily_metric_rows_after_second_import": 10,
+    "step_count_2025_03_10_after_second_import": 1600.0
+  }
+}

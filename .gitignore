@@ -1,0 +1,27 @@
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# The golden snapshot holds real aggregate figures — a year of someone's resting
+# heart rate is still their medical information, and a repository is forever.
+# Regenerate it locally with `python3 tools/golden.py record <export>`.
+/Tests/Fixtures/golden.json
+
+# Health data never belongs in version control.
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.parquet
+export.xml
+export_cda.xml
+apple_health_export/
+/Fixtures/real/
+
+# Model weights
+*.safetensors
+*.gguf
+*.mlmodelc/
+Models/
