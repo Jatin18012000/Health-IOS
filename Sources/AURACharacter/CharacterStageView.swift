@@ -15,13 +15,91 @@ public struct CharacterStageView: View {
     private let assets: CharacterAssets
     private let state: CharacterState
     private let mood: CharacterMood
+    private let manifest: CharacterManifest
+    /// Where the `.moc3`, `.physics3.json` and textures live. Nil until there
+    /// is a rig, which is most of this project's life.
+    private let rigDirectory: URL?
+
+    /// Built once, and only when a rig is both configured and loadable. Held as
+    /// state so the Metal view is not torn down and rebuilt on every redraw.
+    @State private var rig: RigLoad = .notAttempted
+
+    enum RigLoad {
+        case notAttempted
+        case failed(String)
+        #if canImport(CubismBridge)
+        case loaded(Live2DRenderer)
+        #endif
+    }
 
     public init(state: CharacterState = .idle,
                 mood: CharacterMood = .neutral,
-                assets: CharacterAssets = .placeholder) {
+                assets: CharacterAssets = .placeholder,
+                manifest: CharacterManifest = .placeholder,
+                rigDirectory: URL? = nil) {
         self.state = state
         self.mood = mood
         self.assets = assets
+        self.manifest = manifest
+        self.rigDirectory = rigDirectory
+    }
+
+    /// What this build can actually draw, as opposed to what the manifest asks
+    /// for.
+    ///
+    /// The Cubism SDK is a proprietary download that is not in this repository,
+    /// so a build without `CubismBridge` linked cannot render a rig no matter
+    /// what the manifest says. Falling back silently would make a missing SDK
+    /// look like a broken rig; this names it.
+    enum Resolution {
+        case procedural
+        case rig
+        case rigUnavailable(String)
+    }
+
+    var resolution: Resolution {
+        guard manifest.renderer == .live2d else { return .procedural }
+        let missing = manifest.missingParameters()
+        guard missing.isEmpty else {
+            return .rigUnavailable(
+                "the rig is missing \(missing.count == 1 ? "parameter" : "parameters") "
+                + missing.joined(separator: ", "))
+        }
+        guard rigDirectory != nil else {
+            return .rigUnavailable("no rig folder is configured")
+        }
+        #if canImport(CubismBridge)
+        if case .failed(let reason) = rig { return .rigUnavailable(reason) }
+        return .rig
+        #else
+        return .rigUnavailable("this build has no Cubism SDK linked")
+        #endif
+    }
+
+    /// Loads the rig, once.
+    ///
+    /// A failure here degrades to the placeholder with the reason attached
+    /// rather than to an empty stage: the character is the least critical thing
+    /// on the dashboard and must never be the reason it does not draw.
+    private func loadRigIfNeeded() {
+        #if canImport(CubismBridge)
+        guard manifest.renderer == .live2d,
+              case .notAttempted = rig,
+              let directory = rigDirectory else { return }
+        do {
+            // Named apart from `renderer`, the procedural placeholder, which
+            // stays alive either way: one of the two draws, both conform to
+            // `CharacterRenderer`, and nothing outside this file knows which.
+            let live2d = try Live2DRenderer(
+                directory: directory.appending(path: manifest.assetPath))
+            live2d.start()
+            live2d.apply(state: state, mood: mood)
+            rig = .loaded(live2d)
+        } catch {
+            rig = .failed((error as? LocalizedError)?.errorDescription
+                          ?? "the rig could not be opened")
+        }
+        #endif
     }
 
     public var body: some View {
@@ -46,9 +124,10 @@ public struct CharacterStageView: View {
                     .scaleEffect(1 + renderer.breath * 0.012)
                     .position(x: geo.size.width / 2, y: geo.size.height - 190)
 
-                character(in: geo.size)
+                figure(in: geo.size)
 
                 statusChips
+                rigNotice
             }
             .contentShape(Rectangle())
             .onContinuousHover { phase in
@@ -56,23 +135,69 @@ public struct CharacterStageView: View {
                 case .active(let point):
                     // Normalised to -1...1 so the renderer never has to know
                     // the size of the view it is drawn in.
-                    renderer.look(at: CGPoint(
+                    look(at: CGPoint(
                         x: (point.x / geo.size.width) * 2 - 1,
                         y: (point.y / geo.size.height) * 2 - 1))
                 case .ended:
-                    renderer.look(at: nil)
+                    look(at: nil)
                 }
             }
         }
         .onAppear {
+            loadRigIfNeeded()
             renderer.start()
             renderer.apply(state: state, mood: mood)
         }
-        .onDisappear { renderer.stop() }
+        .onDisappear {
+            renderer.stop()
+            #if canImport(CubismBridge)
+            if case .loaded(let live2d) = rig { live2d.stop() }
+            #endif
+        }
         // Driven from outside rather than by a method call: a View is a value,
         // so calling into a copy of it would silently do nothing.
-        .onChange(of: state) { _, new in renderer.apply(state: new, mood: mood) }
-        .onChange(of: mood) { _, new in renderer.apply(state: state, mood: new) }
+        .onChange(of: state) { _, new in drive(state: new, mood: mood) }
+        .onChange(of: mood) { _, new in drive(state: state, mood: new) }
+    }
+
+    /// Both renderers implement `CharacterRenderer`, so the stage drives
+    /// whichever one is live through the same two calls. That protocol is the
+    /// entire point of the seam — swapping the placeholder for a rig changes
+    /// this file and no dashboard code.
+    private func drive(state: CharacterState, mood: CharacterMood) {
+        #if canImport(CubismBridge)
+        if case .loaded(let live2d) = rig {
+            live2d.apply(state: state, mood: mood)
+            return
+        }
+        #endif
+        renderer.apply(state: state, mood: mood)
+    }
+
+    private func look(at point: CGPoint?) {
+        #if canImport(CubismBridge)
+        if case .loaded(let live2d) = rig {
+            live2d.look(at: point)
+            return
+        }
+        #endif
+        renderer.look(at: point)
+    }
+
+    /// The rig if it loaded, the procedural placeholder otherwise.
+    @ViewBuilder
+    private func figure(in size: CGSize) -> some View {
+        #if canImport(CubismBridge)
+        if case .loaded(let live2d) = rig {
+            Live2DStageView(renderer: live2d)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 60)
+        } else {
+            character(in: size)
+        }
+        #else
+        character(in: size)
+        #endif
     }
 
     // MARK: Layers
@@ -127,6 +252,28 @@ public struct CharacterStageView: View {
             // value drives ParamMouthOpenY continuously instead.
             let index = min(shapes.count - 1, Int(renderer.mouthOpen * Double(shapes.count)))
             shapes[index].resizable().scaledToFit()
+        }
+    }
+
+    /// Shown only when a rig is configured and cannot be drawn. The
+    /// placeholder renders regardless — nothing in the app waits on the art,
+    /// which was the point of the seam.
+    @ViewBuilder
+    private var rigNotice: some View {
+        if case .rigUnavailable(let reason) = resolution {
+            VStack {
+                Spacer()
+                HStack(spacing: 7) {
+                    Image(systemName: "person.crop.square.badge.camera")
+                        .font(.system(size: 10))
+                    Text("Placeholder — \(reason).")
+                        .font(.system(size: 9.5))
+                }
+                .foregroundStyle(theme.textSecondary)
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(Capsule().fill(theme.surface.opacity(0.85)))
+                .padding(.bottom, 14)
+            }
         }
     }
 

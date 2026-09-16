@@ -30,20 +30,6 @@ public final class ImportViewModel {
         case failed(String)
     }
 
-    public enum Failure: LocalizedError {
-        case noExportFound(URL)
-
-        public var errorDescription: String? {
-            switch self {
-            case .noExportFound(let url):
-                """
-                No export.xml inside “\(url.lastPathComponent)”. On your iPhone: \
-                Health → your profile picture → Export All Health Data.
-                """
-            }
-        }
-    }
-
     public private(set) var phase: Phase = .idle
 
     public var isRunning: Bool {
@@ -89,7 +75,10 @@ public final class ImportViewModel {
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
 
             do {
-                let xml = try Self.locateExportXML(in: url)
+                // Resolved here as well as inside `run`, so a folder with no
+                // export.xml fails before the progress UI appears rather than
+                // one frame into it.
+                let xml = try ImportSession.locateExportXML(in: url)
 
                 let session = ImportSession(store: store)
                 let outcome = try await session.run(from: xml) { [weak self] state in
@@ -130,31 +119,5 @@ public final class ImportViewModel {
         case .idle, .finished, .failed:
             break
         }
-    }
-
-    // MARK: Finding the export
-
-    /// Accepts either the unzipped `apple_health_export` folder or the
-    /// `export.xml` inside it — both are reasonable things to drop on a window.
-    ///
-    /// Looks at the top level and one level down, the latter because the
-    /// archive wraps everything in `apple_health_export/`. Deliberately not a
-    /// recursive walk: descending a whole home directory looking for a file is
-    /// not a file picker's job.
-    static func locateExportXML(in url: URL) throws -> URL {
-        var isDirectory: ObjCBool = false
-        FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
-        guard isDirectory.boolValue else { return url }
-
-        let direct = url.appending(path: "export.xml")
-        if FileManager.default.isReadableFile(atPath: direct.path) { return direct }
-
-        let children = (try? FileManager.default.contentsOfDirectory(
-            at: url, includingPropertiesForKeys: nil)) ?? []
-        for child in children {
-            let nested = child.appending(path: "export.xml")
-            if FileManager.default.isReadableFile(atPath: nested.path) { return nested }
-        }
-        throw Failure.noExportFound(url)
     }
 }

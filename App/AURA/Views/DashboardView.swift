@@ -16,9 +16,19 @@ public struct DashboardView: View {
     /// state that names the fix and can't perform it is a dead end.
     private let onImport: (() -> Void)?
 
-    public init(model: DashboardViewModel, onImport: (() -> Void)? = nil) {
+    /// Which renderer the character stage should use. `.placeholder` until a
+    /// rig is installed, which is most of this project's life.
+    private let characterManifest: CharacterManifest
+    private let rigDirectory: URL?
+
+    public init(model: DashboardViewModel,
+                onImport: (() -> Void)? = nil,
+                characterManifest: CharacterManifest = .placeholder,
+                rigDirectory: URL? = nil) {
         _model = State(wrappedValue: model)
         self.onImport = onImport
+        self.characterManifest = characterManifest
+        self.rigDirectory = rigDirectory
     }
 
     public var body: some View {
@@ -200,7 +210,9 @@ public struct DashboardView: View {
 
     private var centreColumn: some View {
         VStack(spacing: 14) {
-            CharacterStageView(state: .idle, mood: mood)
+            CharacterStageView(state: .idle, mood: mood,
+                               manifest: characterManifest,
+                               rigDirectory: rigDirectory)
                 .frame(maxHeight: .infinity)
             scorePanel
         }

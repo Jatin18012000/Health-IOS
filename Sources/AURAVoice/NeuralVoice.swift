@@ -41,6 +41,8 @@ public final class NeuralVoice: VoiceEngine, @unchecked Sendable {
     /// changes between sessions is a different companion.
     public var voice = "af_heart"
 
+    public var identifier: String { "Kokoro-82M · \(voice)" }
+
     public init(modelDirectory: URL) {
         self.modelDirectory = modelDirectory
     }

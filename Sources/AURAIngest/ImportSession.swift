@@ -39,6 +39,47 @@ public actor ImportSession {
         self.store = store
     }
 
+    public enum SessionError: Error, Sendable, LocalizedError {
+        case noExportFound(URL)
+
+        public var errorDescription: String? {
+            switch self {
+            case .noExportFound(let url):
+                """
+                No export.xml inside “\(url.lastPathComponent)”. On your iPhone: \
+                Health → your profile picture → Export All Health Data.
+                """
+            }
+        }
+    }
+
+    /// Resolve whatever was handed over to the `export.xml` inside it.
+    ///
+    /// Asks the filesystem rather than reading `hasDirectoryPath`, which is a
+    /// trailing-slash heuristic: a directory URL built with `appending(path:)`
+    /// reports false, and the import would then try to parse the folder itself.
+    ///
+    /// Looks at the top level and one level down, the latter because both the
+    /// archive and the folder wrap everything in `apple_health_export/`.
+    /// Deliberately not a recursive walk — descending a whole home directory
+    /// looking for a file is not a file picker's job.
+    public static func locateExportXML(in url: URL) throws -> URL {
+        var isDirectory: ObjCBool = false
+        FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+        guard isDirectory.boolValue else { return url }
+
+        let direct = url.appending(path: "export.xml")
+        if FileManager.default.isReadableFile(atPath: direct.path) { return direct }
+
+        let children = (try? FileManager.default.contentsOfDirectory(
+            at: url, includingPropertiesForKeys: nil)) ?? []
+        for child in children {
+            let nested = child.appending(path: "export.xml")
+            if FileManager.default.isReadableFile(atPath: nested.path) { return nested }
+        }
+        throw SessionError.noExportFound(url)
+    }
+
     /// Running counts, accumulated inside the parse.
     private final class Tally: @unchecked Sendable {
         var parsed = 0
@@ -57,7 +98,7 @@ public actor ImportSession {
         onState: @escaping @Sendable (State) -> Void = { _ in }
     ) async throws -> Outcome {
         let started = Date()
-        let xml = url.hasDirectoryPath ? url.appending(path: "export.xml") : url
+        let xml = try Self.locateExportXML(in: url)
 
         let importer = AppleHealthImporter()
         let store = self.store

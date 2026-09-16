@@ -38,6 +38,13 @@ public final class SystemVoice: NSObject, VoiceEngine, @unchecked Sendable {
     /// 0...1, where 0.5 is the system default rate.
     public var rate: Float = AVSpeechUtteranceDefaultSpeechRate
 
+    public var identifier: String {
+        guard let voiceIdentifier,
+              let voice = AVSpeechSynthesisVoice(identifier: voiceIdentifier)
+        else { return "System voice" }
+        return "System voice · \(voice.name)"
+    }
+
     public override init() {
         super.init()
     }
