@@ -1,5 +1,6 @@
 // swift-tools-version: 6.0
 import PackageDescription
+import Foundation
 
 // AURA is built as a set of local Swift packages plus a thin Xcode app target.
 //
@@ -11,6 +12,72 @@ import PackageDescription
 // Build and test from the command line with `swift build` / `swift test`.
 // The app itself is an Xcode target that depends on this package -- see
 // App/README.md for the one-time setup.
+
+// MARK: - The Cubism SDK, if it is here
+
+// The Live2D Cubism SDK for Native is a proprietary download that requires an
+// account and agreeing to a licence, so it cannot live in this repository. The
+// package therefore *detects* it rather than requiring it: with the SDK
+// vendored, `CubismBridge` is built and `AURACharacter` links it; without, the
+// package builds exactly as it did before and `Live2DRenderer` stays behind its
+// `#if canImport(CubismBridge)` guard, drawing the procedural placeholder.
+//
+// The alternative — declaring the targets unconditionally — turns a working
+// `swift build` into a broken one for anyone who has not downloaded a
+// proprietary SDK, including CI. That is not a trade worth making for a
+// character renderer.
+//
+// Run `tools/setup_cubism.sh` to check a download is laid out as expected.
+
+let cubismRoot = Context.packageDirectory + "/Vendor/CubismSDK"
+let hasCubism = FileManager.default.fileExists(
+    atPath: cubismRoot + "/Core/include/Live2DCubismCore.h")
+
+let cubismTargets: [Target] = hasCubism ? [
+    // The Framework: Live2D's C++ layer over the Core. Vendored as source
+    // because that is how the SDK ships it.
+    //
+    // No separate target for the Core itself. A `.systemLibrary` would need a
+    // `module.modulemap` inside the SDK folder, and that folder is a download
+    // this repository does not own — so the Core is reached by header search
+    // path and linked as a plain library instead.
+    .target(
+        name: "CubismFramework",
+        path: "Vendor/CubismSDK/Framework/src",
+        // Only the Metal renderer. The SDK ships OpenGL, Vulkan, D3D and
+        // Cocos2d backends in the same tree; compiling them costs build time
+        // to produce code this app can never reach.
+        exclude: [
+            "Rendering/OpenGL", "Rendering/Vulkan", "Rendering/D3D9",
+            "Rendering/D3D11", "Rendering/Cocos2d",
+        ],
+        cxxSettings: [
+            .headerSearchPath("."),
+            .headerSearchPath("../../Core/include"),
+        ]),
+
+    .target(
+        name: "CubismBridge",
+        dependencies: ["CubismFramework"],
+        path: "Sources/CubismBridge",
+        cxxSettings: [
+            .headerSearchPath("../../Vendor/CubismSDK/Framework/src"),
+            .headerSearchPath("../../Vendor/CubismSDK/Core/include"),
+        ],
+        linkerSettings: [
+            // `unsafeFlags` is how a vendored `.a` gets onto the link line, and
+            // it is acceptable only because AURA is a root package — SwiftPM
+            // forbids unsafe flags in a package something else depends on. If
+            // this is ever consumed as a dependency, this is what has to change.
+            .unsafeFlags(["-L\(cubismRoot)/Core/lib/macos"]),
+            .linkedLibrary("Live2DCubismCore"),
+            .linkedFramework("Metal"),
+            .linkedFramework("MetalKit"),
+        ]),
+] : []
+
+let characterDependencies: [Target.Dependency] =
+    ["AURACore", "AURADesign"] + (hasCubism ? ["CubismBridge"] : [])
 
 let package = Package(
     name: "AURA",
@@ -102,7 +169,11 @@ let package = Package(
         ]),
 
         // The companion: mood state machine, sprite renderer, Live2D seam.
-        .target(name: "AURACharacter", dependencies: ["AURACore", "AURADesign"]),
+        //
+        // `CubismBridge` is in this list only when the SDK is vendored; see the
+        // detection above. `Live2DRenderer` guards on `canImport(CubismBridge)`
+        // so the module compiles either way.
+        .target(name: "AURACharacter", dependencies: characterDependencies),
 
         // Theme tokens, neon/glass components, chart styling.
         .target(name: "AURADesign", dependencies: ["AURACore"]),
@@ -114,5 +185,5 @@ let package = Package(
         .testTarget(name: "AURAMemoryTests",       dependencies: ["AURAMemory"]),
         .testTarget(name: "AURAStoreTests",        dependencies: ["AURAStore"]),
         .testTarget(name: "AURACharacterTests",    dependencies: ["AURACharacter"]),
-    ]
+    ] + cubismTargets
 )

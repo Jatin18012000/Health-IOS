@@ -52,6 +52,12 @@ jobs:
         # must not get through.
         run: python3 tools/output_guard.py --self-test
 
+      - name: Character rig — manifest, references, parameters, physics
+        # The rig is a binary the app loads at runtime, so nothing else catches
+        # a reference that stopped resolving or a parameter that got renamed.
+        # It checks structure only; appearance needs Cubism Viewer.
+        run: python3 tools/check_character.py
+
 # ## Not covered
 #
 # **`swift build` / `swift test`.** Not a cost decision: this repository is

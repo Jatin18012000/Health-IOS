@@ -17,7 +17,11 @@ One-time setup, once you're on the Mac:
    **User Selected File** read access. The import screen needs the latter for
    both the file panel and the drop target; without it a dropped folder reads
    as empty rather than as denied, which looks like a broken importer.
-5. Add **`NSMicrophoneUsageDescription`** to Info.plist. Without it the app
+5. Link **`CubismBridge`** too, but only once `Vendor/CubismSDK` exists —
+   see `Vendor/README.md` and run `tools/setup_cubism.sh` first. Without the
+   SDK the target does not exist and the app draws the procedural placeholder,
+   which is the normal state.
+6. Add **`NSMicrophoneUsageDescription`** to Info.plist. Without it the app
    does not prompt for the microphone — it crashes the moment the audio engine
    starts, which looks like a bug in the talk button rather than a missing key.
    Something like: *"AURA transcribes what you say on this device. No audio

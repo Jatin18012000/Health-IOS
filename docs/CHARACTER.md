@@ -184,6 +184,12 @@ Then rigged with the standard Cubism parameters: `ParamAngleX/Y/Z`,
 `ParamMouthOpenY`, `ParamMouthForm`, `ParamBodyAngleX/Y/Z`, `ParamBreath`, plus
 physics groups for hair and ponytail.
 
+> **Superseded.** A rig was delivered on 17 September 2026 and lives in
+> `Resources/Characters/aura/`. The two routes below are kept for the record.
+> What is actually outstanding — the `CubismBridge` target, a missing
+> `physics3.json`, and the unverified mouth range — is in
+> `docs/CHARACTER_DELIVERY_REPORT.md`.
+
 ### Two routes
 
 **Commission it.** An artist separates the layers, paints the occluded regions

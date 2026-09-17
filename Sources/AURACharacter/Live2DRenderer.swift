@@ -4,6 +4,7 @@ import AURACore
 #if canImport(CubismBridge)
 import CubismBridge
 import MetalKit
+import QuartzCore
 
 /// The rig, once it exists.
 ///
@@ -58,8 +59,16 @@ public final class Live2DRenderer: CharacterRenderer {
         self.model = handle
     }
 
+    /// True once an `MTKView` is driving frames, so the fallback timer stands
+    /// down. Two things calling `tick` would advance physics at twice real
+    /// speed — the hair would behave as though gravity had doubled.
+    private var isDisplayDriven = false
+
     public func start() {
-        guard ticker == nil else { return }
+        guard ticker == nil, !isDisplayDriven else { return }
+        // A timer, not a display link, and deliberately the *fallback*: it runs
+        // only until a Metal view attaches. It exists so a renderer that is
+        // alive but not on screen still advances, which keeps `apply` honest.
         ticker = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(16))
@@ -71,6 +80,36 @@ public final class Live2DRenderer: CharacterRenderer {
     public func stop() {
         ticker?.cancel()
         ticker = nil
+    }
+
+    // MARK: - Frames from the view
+
+    /// Called by `Live2DStageView` when it takes over frame timing.
+    func displayWillDrive() {
+        isDisplayDriven = true
+        stop()
+    }
+
+    func displayStoppedDriving() {
+        isDisplayDriven = false
+    }
+
+    /// Advance one frame. The Metal view calls this at display rate.
+    func advance(_ deltaTime: TimeInterval) {
+        tick(deltaTime)
+    }
+
+    func prepareRenderer(device: MTLDevice, drawableSize: CGSize) -> Bool {
+        model.prepareRenderer(with: device, drawableSize: drawableSize)
+    }
+
+    func drawableSizeChanged(_ size: CGSize) {
+        model.setDrawableSize(size)
+    }
+
+    func draw(commandBuffer: MTLCommandBuffer,
+              renderPassDescriptor: MTLRenderPassDescriptor) {
+        model.draw(with: commandBuffer, renderPassDescriptor: renderPassDescriptor)
     }
 
     // MARK: - CharacterRenderer
@@ -149,20 +188,104 @@ public final class Live2DRenderer: CharacterRenderer {
 }
 
 /// Hosts the Metal view the model renders into.
+///
+/// The view owns frame timing. `MTKView`'s delegate is driven by a
+/// `CVDisplayLink`, so frames land in step with the display rather than on a
+/// timer that drifts against it — which for a face is the difference between
+/// motion and judder.
 public struct Live2DStageView: NSViewRepresentable {
     let renderer: Live2DRenderer
 
     public init(renderer: Live2DRenderer) { self.renderer = renderer }
 
+    public func makeCoordinator() -> Coordinator { Coordinator(renderer: renderer) }
+
     public func makeNSView(context: Context) -> MTKView {
         let view = MTKView()
         view.device = MTLCreateSystemDefaultDevice()
+        view.delegate = context.coordinator
+        // Transparent: she is composited over the themed background, and an
+        // opaque black rectangle behind her is exactly the "figure pasted on a
+        // dead panel" look the whole stage is built to avoid.
         view.layer?.isOpaque = false
+        view.isOpaque = false
         view.clearColor = MTLClearColorMake(0, 0, 0, 0)
+        view.colorPixelFormat = .bgra8Unorm
+        view.framebufferOnly = false
+        renderer.displayWillDrive()
         return view
     }
 
-    public func updateNSView(_ view: MTKView, context: Context) {}
+    public func updateNSView(_ view: MTKView, context: Context) {
+        context.coordinator.renderer = renderer
+    }
+
+    public static func dismantleNSView(_ view: MTKView, coordinator: Coordinator) {
+        view.delegate = nil
+        coordinator.renderer.displayStoppedDriving()
+    }
+
+    /// `MTKViewDelegate` is not `@MainActor`-annotated, and `MTKView` calls it
+    /// on the main thread anyway. Under Swift 6's strict checking that mismatch
+    /// is the most likely thing in this file to need an adjustment on the first
+    /// build — probably `nonisolated` methods with a `MainActor.assumeIsolated`
+    /// inside. Left as the honest shape until a compiler says otherwise.
+    @MainActor
+    public final class Coordinator: NSObject, MTKViewDelegate {
+        var renderer: Live2DRenderer
+        private var prepared = false
+        private var lastFrame: CFTimeInterval?
+
+        init(renderer: Live2DRenderer) {
+            self.renderer = renderer
+        }
+
+        public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+            renderer.drawableSizeChanged(size)
+        }
+
+        public func draw(in view: MTKView) {
+            guard let device = view.device,
+                  let descriptor = view.currentRenderPassDescriptor,
+                  let drawable = view.currentDrawable,
+                  let queue = Self.queue(for: device),
+                  let commandBuffer = queue.makeCommandBuffer()
+            else { return }
+
+            // Built on the first frame rather than in makeNSView: the drawable
+            // size is not known until the view has been laid out, and the
+            // renderer sizes its mask buffers from it.
+            if !prepared {
+                prepared = renderer.prepareRenderer(
+                    device: device, drawableSize: view.drawableSize)
+                guard prepared else { return }
+            }
+
+            // Measured, not assumed to be 1/60: `preferredFramesPerSecond` is a
+            // request, and a dropped frame that advances physics by the wrong
+            // amount shows up as a hitch in the hair.
+            let now = CACurrentMediaTime()
+            let delta = lastFrame.map { min(now - $0, 1.0 / 20.0) } ?? 1.0 / 60.0
+            lastFrame = now
+            renderer.advance(delta)
+
+            renderer.draw(commandBuffer: commandBuffer,
+                          renderPassDescriptor: descriptor)
+            commandBuffer.present(drawable)
+            commandBuffer.commit()
+        }
+
+        /// One queue per device, for the lifetime of the process. Creating a
+        /// command queue per frame is a documented way to stall.
+        private static var queues: [ObjectIdentifier: MTLCommandQueue] = [:]
+        private static func queue(for device: MTLDevice) -> MTLCommandQueue? {
+            let key = ObjectIdentifier(device)
+            if let existing = queues[key] { return existing }
+            guard let made = device.makeCommandQueue() else { return nil }
+            queues[key] = made
+            return made
+        }
+    }
 }
 #endif
 
