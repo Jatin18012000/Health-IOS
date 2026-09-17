@@ -185,5 +185,11 @@ let package = Package(
         .testTarget(name: "AURAMemoryTests",       dependencies: ["AURAMemory"]),
         .testTarget(name: "AURAStoreTests",        dependencies: ["AURAStore"]),
         .testTarget(name: "AURACharacterTests",    dependencies: ["AURACharacter"]),
+        // AURACore/Analytics/Memory are declared rather than leaned on
+        // transitively: the suite builds its own store double and its own
+        // annotations, so it imports all three directly.
+        .testTarget(name: "AURAReportTests", dependencies: [
+            "AURAReport", "AURACore", "AURAAnalytics", "AURAMemory",
+        ]),
     ] + cubismTargets
 )
