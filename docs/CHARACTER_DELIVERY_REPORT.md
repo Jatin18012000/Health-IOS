@@ -1,0 +1,145 @@
+# Rig delivery — acceptance report
+
+Checked against the criteria in `docs/LIVE2D_SETUP.md` §1 and against
+`CharacterManifest.required`. Every claim below was verified against the files
+themselves, not taken from the supplier's own validation report.
+
+**Verdict: accept.** The rig is real, complete on the parameters that matter,
+and correctly packaged. Three things are missing or unverifiable, one of which
+is visible on screen (static hair) and one of which blocks loading entirely
+until the SDK is in place.
+
+---
+
+## What was verified
+
+| Check | Result |
+|---|---|
+| `.moc3` is a real rig, not a stub | ✅ `MOC3` magic, 29,504 bytes, 27 parameter IDs embedded in the binary |
+| All 12 parameters in `CharacterManifest.required` | ✅ present — cross-checked against the Swift source, not retyped |
+| `model3.json` references resolve | ✅ moc, texture and display-info paths all exist on disk |
+| Texture decodes | ✅ 1024×1024, RGBA, 8-bit |
+| Eye-blink and lip-sync groups declared | ✅ `ParamEyeLOpen`/`ParamEyeROpen`, `ParamMouthOpenY` |
+| Editable source supplied | ✅ `.cmo3`, 898 KB |
+| Free-tier parameter ceiling (30) | ✅ 27 used |
+
+The supplier's `VALIDATION_REPORT.md` is accurate as far as it goes, and honest
+about its own boundary — it says plainly that deformation quality was not
+checked because no Cubism Core was available to it. That is the right thing to
+have said.
+
+The rig also carries 15 parameters beyond the 12 required — `ParamAngleZ`, eye
+smiles, brow X/angle/form, `ParamCheek`, `ParamBodyAngleX/Y` and the three hair
+parameters. Nothing drives them today. They cost nothing and widen what
+`MoodResolver` could express later.
+
+---
+
+## Missing #1 — no `physics3.json`, so the hair does not move
+
+`model3.json`'s `FileReferences` contains `Moc`, `Textures` and `DisplayInfo`
+and **no `Physics` key**. No physics file is in the delivery.
+
+The rig defines `ParamHairFront`, `ParamHairSide` and `ParamHairBack` — the
+standard physics *output* parameters — so it was built expecting physics.
+Nothing sets them. `Live2DRenderer.tick` calls `model.updatePhysics(Float(dt))`
+on every frame and it has nothing to act on.
+
+`docs/LIVE2D_SETUP.md` puts it bluntly: *no physics file means a static wig*.
+Her head will turn and the hair will turn with it as one rigid piece. It is the
+kind of thing that reads as "cheap" without the viewer being able to say why.
+
+**Fix:** open `source/AURA_Live2D_Final.cmo3` in Cubism Editor, configure
+physics groups against the three hair parameters, then File → Export Embedded
+File → Export Physics Settings. Physics is **included in the free tier**, so
+this costs nothing but an evening. It does not require going back to the
+supplier.
+
+## Missing #2 — the `CubismBridge` target does not exist
+
+This is the real blocker, and it predates this delivery.
+
+`Live2DRenderer.swift` is entirely inside `#if canImport(CubismBridge)`.
+That module has never existed — there are no references to it in
+`Package.swift`. So today the rig cannot be loaded by anything, and
+`CharacterStageView` will correctly draw the procedural placeholder with the
+message *"this build has no Cubism SDK linked"*.
+
+Outstanding work, none of it done:
+
+1. Download **Cubism SDK for Native 5.3 or newer** (see #3).
+2. Add a `CubismBridge` target wrapping the C++ Core in Objective-C++, exposing
+   the `CubismModelHandle` interface `Live2DRenderer` already calls —
+   `setParameter`, `update`, `updatePhysics`.
+3. Implement the Metal render loop. `Live2DStageView.makeNSView` creates an
+   `MTKView` and `updateNSView` is **empty**; nothing currently draws.
+4. Verify the call signatures. They were written from the published API shape
+   and have never been compiled — the file says so itself.
+
+## Missing #3 — the SDK must be 5.3+, or it will not load at all
+
+The `.moc3` is **version 6**, which is a Cubism 5.3 export. Cubism Cores older
+than 5.3 refuse it outright:
+
+```
+csmReviveMocInPlace is failed.
+The Core unsupport later than moc3 ver:[5]. This moc3 ver is [6].
+```
+
+Worth knowing in advance, because that message does not obviously mean "your SDK
+is too old", and downloading whichever SDK a search result offers first is an
+easy way to lose an afternoon.
+
+## Cannot be verified here — the mouth
+
+`docs/LIVE2D_SETUP.md` calls this *the single most likely thing to be wrong with
+a commission and the easiest to miss, because it looks fine in any demo video*:
+
+> Drag `ParamMouthOpenY` slowly from 0 to 1 and watch. A rig built for
+> expression presets often snaps between two mouth shapes, which is fine for
+> pre-recorded animation and wrong here.
+
+Her mouth is driven by a live audio amplitude stream, so **every intermediate
+value is used**. Whether this rig deforms smoothly across the range cannot be
+established from the files — it needs Cubism Viewer, or the renderer running.
+
+**Do this before building anything.** Open the model in Cubism Viewer (free),
+drag that one parameter slowly, and watch for snapping. It is five minutes, and
+it is the difference between discovering a re-rig is needed now or after the
+whole bridge is built.
+
+---
+
+## Not missing, despite being absent
+
+Recorded so they do not get chased:
+
+- **No `.motion3.json`.** Correct. All motion is parameter-driven from Swift —
+  breathing, blinking and gaze are computed in `Live2DRenderer.tick`. Canned
+  animation clips would fight it.
+- **No `.pose3.json`.** Correct. Nothing in the app switches part visibility.
+- **No layered `.psd`.** The `.cmo3` embeds the artwork, so the rig stays
+  editable. A PSD would only matter for re-drawing the art itself.
+
+## Minor
+
+The texture is a single 1024×1024 atlas and the part names suggest a full
+figure (`face`, `neck`, `topwear`, `legwear`, `handwear`, `headwear`, `ears`,
+`earwear`, `eyebrow`, `eyelash`, `eyewhite`, `irides`, `mouth`, `nose`). Her
+face therefore occupies a modest fraction of a 1024 atlas, and she renders in a
+~520 pt column that is 1040 px on a Retina display. Faces may read soft. Judge
+it on screen rather than pre-emptively; re-exporting the atlas at 2048 from the
+`.cmo3` is cheap if it does.
+
+---
+
+## What to do next, in order
+
+1. **Cubism Viewer check** on `ParamMouthOpenY` — five minutes, highest risk.
+2. **Add physics** from the `.cmo3` — free, one evening, fixes the static hair.
+3. **Download Cubism SDK for Native 5.3+**.
+4. **Build the `CubismBridge` target and the Metal render loop** — the long pole.
+
+Steps 1 and 2 are worth doing before 3 and 4. They need only the free editor,
+and if the mouth turns out to need a re-rig it is far better to know that before
+the bridge exists than after.

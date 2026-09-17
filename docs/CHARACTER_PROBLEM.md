@@ -1,5 +1,12 @@
 # The character problem — a briefing
 
+> **RESOLVED — 17 September 2026.** A finished Live2D rig was delivered, with
+> all 12 required parameters present. This file is kept as the record of how the
+> problem was framed and what was ruled out; **do not act on it**. Current state
+> is in `docs/CHARACTER_DELIVERY_REPORT.md`, and the remaining work is the
+> `CubismBridge` target, a `physics3.json`, and the mouth check — not the
+> art-sourcing question below.
+
 **Purpose of this file.** It is written to be handed to someone outside the
 project — another person, or another AI — who knows nothing about it. Everything
 needed to give a useful answer is here, including the constraints that rule

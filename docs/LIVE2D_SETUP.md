@@ -36,6 +36,11 @@ cannot fix a weight without going back to the artist.
 
 ## 2. Get the SDK
 
+**It must be 5.3 or newer.** The delivered rig is a moc3 **version 6** file, and
+an older Core refuses it outright with `csmReviveMocInPlace is failed. The Core
+unsupport later than moc3 ver:[5]. This moc3 ver is [6]` — which does not
+obviously mean "your SDK is too old".
+
 Cubism SDK for Native, from live2d.com. Free below the revenue threshold you are
 comfortably under (`docs/COST.md`), but it requires an account and is not
 redistributable — which is why it is not in this repository and why the bridge

@@ -1,0 +1,33 @@
+{
+  "renderer": "live2d",
+  "assetPath": "live2d",
+  "parameters": [
+    "ParamAngleX",
+    "ParamAngleY",
+    "ParamAngleZ",
+    "ParamEyeLOpen",
+    "ParamEyeLSmile",
+    "ParamEyeROpen",
+    "ParamEyeRSmile",
+    "ParamEyeBallX",
+    "ParamEyeBallY",
+    "ParamBrowLY",
+    "ParamBrowRY",
+    "ParamBrowLX",
+    "ParamBrowRX",
+    "ParamBrowLAngle",
+    "ParamBrowRAngle",
+    "ParamBrowLForm",
+    "ParamBrowRForm",
+    "ParamMouthForm",
+    "ParamMouthOpenY",
+    "ParamCheek",
+    "ParamBodyAngleX",
+    "ParamBodyAngleY",
+    "ParamBodyAngleZ",
+    "ParamBreath",
+    "ParamHairFront",
+    "ParamHairSide",
+    "ParamHairBack"
+  ]
+}
