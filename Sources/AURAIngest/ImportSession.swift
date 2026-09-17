@@ -100,7 +100,6 @@ public actor ImportSession {
         let started = Date()
         let xml = try Self.locateExportXML(in: url)
 
-        let importer = AppleHealthImporter()
         let store = self.store
 
         // The store is written from INSIDE the parse, batch by batch. An
@@ -112,7 +111,14 @@ public actor ImportSession {
         // escaping closure; the parse is single-threaded, so no lock is needed.
         let tally = Tally()
 
-        try await Task.detached(priority: .userInitiated) {
+        // The importer is built *inside* the detached task and never escapes
+        // it. `AppleHealthImporter` is an `NSObject` subclass and not Sendable,
+        // so capturing one here is a hard error under strict concurrency — and
+        // the fix is the right shape anyway: nothing outside the parse has any
+        // business holding a parser.
+        let issues = try await Task.detached(priority: .userInitiated) {
+            () -> [String: Int] in
+            let importer = AppleHealthImporter()
             try importer.importExport(at: xml, onProgress: { progress in
                 onState(.parsing(fraction: progress.fraction, records: progress.recordsSeen))
             }, sink: { batch in
@@ -131,6 +137,9 @@ public actor ImportSession {
                     tally.hi = Swift.max(tally.hi ?? affected.end, affected.end)
                 }
             })
+            // Returned rather than read off the importer afterwards: a
+            // dictionary of counts is Sendable, a parser is not.
+            return importer.issues
         }.value
 
         let parsed = tally.parsed
@@ -143,7 +152,7 @@ public actor ImportSession {
             rejected["batch_write_failed", default: 0] += tally.failedBatches
         }
 
-        for (key, count) in importer.issues { rejected[key, default: 0] += count }
+        for (key, count) in issues { rejected[key, default: 0] += count }
 
         var affected: DayRange?
         if let lo, let hi {

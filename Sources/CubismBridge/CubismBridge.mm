@@ -109,6 +109,21 @@ public:
 
 }  // namespace
 
+namespace {
+NSString *const kCubismBridgeErrorDomain = @"AURA.CubismBridge";
+
+/// Populate `error` and return nil in one step, so every failure path reads the
+/// same and none can forget the reason.
+id Fail(NSError **error, NSString *reason) {
+    if (error != nullptr) {
+        *error = [NSError errorWithDomain:kCubismBridgeErrorDomain
+                                     code:1
+                                 userInfo:@{NSLocalizedDescriptionKey: reason}];
+    }
+    return nil;
+}
+}  // namespace
+
 @implementation CubismModelHandle {
     AuraModel *_model;
     CGSize _drawableSize;
@@ -119,7 +134,8 @@ public:
     NSString *_settingsPath;
 }
 
-- (nullable instancetype)initWithDirectory:(NSString *)directory {
+- (nullable instancetype)initWithDirectory:(NSString *)directory
+                                     error:(NSError **)error {
     self = [super init];
     if (self == nil) { return nil; }
 
@@ -127,20 +143,17 @@ public:
     _drawableSize = CGSizeMake(1, 1);
 
     if (!StartFrameworkOnce()) {
-        _failureReason = @"the Cubism framework would not start";
-        return nil;
+        return Fail(error, @"the Cubism framework would not start");
     }
 
     NSString *const modelJSON = FindModelJSON(directory);
     if (modelJSON == nil) {
-        _failureReason = @"expected exactly one .model3.json in the rig folder";
-        return nil;
+        return Fail(error, @"expected exactly one .model3.json in the rig folder");
     }
 
     NSData *const settingsData = ReadFile(modelJSON);
     if (settingsData == nil) {
-        _failureReason = @"the .model3.json could not be read";
-        return nil;
+        return Fail(error, @"the .model3.json could not be read");
     }
 
     CubismModelSettingJson settings(
@@ -153,9 +166,8 @@ public:
     NSString *const mocName = @(settings.GetModelFileName());
     NSData *const moc = ReadFile([directory stringByAppendingPathComponent:mocName]);
     if (moc == nil || moc.length == 0) {
-        _failureReason = [NSString stringWithFormat:@"missing %@", mocName];
         delete _model; _model = nullptr;
-        return nil;
+        return Fail(error, [NSString stringWithFormat:@"missing %@", mocName]);
     }
 
     // Checked rather than assumed: a rig newer than this Core fails inside
@@ -163,13 +175,13 @@ public:
     const Core::csmMocVersion mocVersion = CubismUserModel::GetMocVersionFromBuffer(
         static_cast<const csmByte *>(moc.bytes), static_cast<csmSizeInt>(moc.length));
     if (mocVersion > Core::csmGetLatestMocVersion()) {
-        _failureReason = [NSString stringWithFormat:
+        NSString *const reason = [NSString stringWithFormat:
             @"this rig is moc3 version %d and the linked Cubism Core only reads "
             @"up to %d — the SDK is too old",
             static_cast<int>(mocVersion),
             static_cast<int>(Core::csmGetLatestMocVersion())];
         delete _model; _model = nullptr;
-        return nil;
+        return Fail(error, reason);
     }
 
     _model->LoadModel(static_cast<const csmByte *>(moc.bytes),
@@ -188,9 +200,8 @@ public:
     }
 
     if (_model->GetModel() == nullptr) {
-        _failureReason = @"the rig loaded but produced no model";
         delete _model; _model = nullptr;
-        return nil;
+        return Fail(error, @"the rig loaded but produced no model");
     }
 
     // Read back what the rig actually has, so a caller can check it against

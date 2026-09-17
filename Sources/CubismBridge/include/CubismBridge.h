@@ -24,13 +24,18 @@ NS_ASSUME_NONNULL_BEGIN
 /// is missing, unreadable, or built for a newer Core than this SDK — the
 /// character is the least critical thing on screen and must never be the reason
 /// the dashboard fails to draw.
+/// Imports into Swift as a throwing initializer, so the reason survives.
+///
+/// An earlier shape returned nil and exposed a `failureReason` property, which
+/// was useless by construction: the property was only ever set on the paths
+/// that returned nil, so there was never an object to read it from. The reason
+/// matters — "your SDK is too old" and "the file is missing" want different
+/// responses — so it travels in the error.
 - (nullable instancetype)initWithDirectory:(NSString *)directory
+                                     error:(NSError **)error
     NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)init NS_UNAVAILABLE;
-
-/// Why the load failed, when it did. For the placeholder's honest message.
-@property(nonatomic, readonly, copy, nullable) NSString *failureReason;
 
 /// Parameter IDs the loaded rig actually has.
 ///
