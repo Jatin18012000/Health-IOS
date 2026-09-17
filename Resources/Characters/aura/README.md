@@ -36,11 +36,13 @@ Older Cores refuse it with `csmReviveMocInPlace is failed. The Core unsupport
 later than moc3 ver:[5]. This moc3 ver is [6]`, which does not obviously mean
 "your SDK is too old".
 
-**There is no `physics3.json`, so the hair is static.** The rig has
-`ParamHairFront`, `ParamHairSide` and `ParamHairBack`, but nothing drives them —
-`Live2DRenderer.tick` calls `updatePhysics` every frame and it has nothing to
-act on. Fixable from the `.cmo3` without going back to the supplier; physics is
-included in Cubism Editor's free tier. See `docs/CHARACTER_DELIVERY_REPORT.md`.
+**The physics is valid but untuned.** `physics3.json` was authored here, not
+delivered: three pendulums driving `ParamHairFront`, `ParamHairSide` and
+`ParamHairBack` from head and body angle. Structure is verified by
+`tools/check_character.py`, but the numbers are conventional starting values
+rather than measurements against this rig's hair. Adjust them in Cubism Editor
+once you can see her move — `Scale` for how far the hair swings, the tip
+vertex's `Delay` and `Acceleration` for how it settles.
 
 Keep `source/` — without the `.cmo3` you cannot adjust a weight or add physics
 without commissioning the model again.

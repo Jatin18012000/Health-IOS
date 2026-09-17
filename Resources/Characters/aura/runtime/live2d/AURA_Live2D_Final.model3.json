@@ -5,6 +5,7 @@
 		"Textures": [
 			"AURA_Live2D_Final.1024/texture_00.png"
 		],
+		"Physics": "AURA_Live2D_Final.physics3.json",
 		"DisplayInfo": "AURA_Live2D_Final.cdi3.json"
 	},
 	"Groups": [

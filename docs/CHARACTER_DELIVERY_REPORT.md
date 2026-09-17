@@ -35,7 +35,23 @@ parameters. Nothing drives them today. They cost nothing and widen what
 
 ---
 
-## Missing #1 — no `physics3.json`, so the hair does not move
+## ~~Missing #1~~ — RESOLVED: physics added 17 September 2026
+
+A `physics3.json` was written and `model3.json` now references it. Three
+settings — front, side and back hair — each driven by `ParamAngleX`/`ParamAngleZ`
+and `ParamBodyAngleX`/`ParamBodyAngleZ`, each a two-vertex pendulum whose length
+and delay scale with the weight of the hair mass it moves. Verified by
+`tools/check_character.py`, which now runs in CI.
+
+**The values are untuned.** They are conventional starting points, not measured
+against this rig's hair geometry, because tuning physics is a visual task and no
+Cubism Core is available here. Expect to adjust `Scale` and the tip vertex's
+`Delay` and `Acceleration` in Cubism Editor once you can see her move. If the
+hair swings too far, lower `Scale`; if it feels sluggish, lower `Delay`.
+
+The original finding, kept for the record:
+
+### The problem as found
 
 `model3.json`'s `FileReferences` contains `Moc`, `Textures` and `DisplayInfo`
 and **no `Physics` key**. No physics file is in the delivery.
