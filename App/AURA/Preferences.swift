@@ -30,23 +30,53 @@ public final class Preferences {
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+
+        // Written to the stored properties, not through the facades below:
+        // going through a setter here would persist the values we just read.
         let id = defaults.string(forKey: Key.theme) ?? Theme.cyberNeon.id
-        self.theme = Theme.all.first { $0.id == id } ?? .cyberNeon
+        self.storedTheme = Theme.all.first { $0.id == id } ?? .cyberNeon
 
         if let data = defaults.data(forKey: Key.goals),
            let decoded = try? JSONDecoder().decode(Goals.self, from: data) {
-            self.goals = decoded
+            self.storedGoals = decoded
         } else {
-            self.goals = .default
+            self.storedGoals = .default
         }
 
-        self.morningBriefEnabled = defaults.object(forKey: Key.morningBrief) as? Bool ?? true
-        self.morningBriefHour = defaults.object(forKey: Key.morningBriefHour) as? Int ?? 8
+        self.storedMorningBriefEnabled =
+            defaults.object(forKey: Key.morningBrief) as? Bool ?? true
+        self.storedMorningBriefHour =
+            defaults.object(forKey: Key.morningBriefHour) as? Int ?? 8
         self.lastBackup = defaults.object(forKey: Key.lastBackup) as? Date
     }
 
+    // MARK: Why these are facades rather than `didSet`
+    //
+    // The obvious way to write this is a stored property with
+    // `didSet { defaults.set(...) }`. It is the wrong way here: `@Observable`
+    // rewrites stored properties into computed ones, and a computed property
+    // cannot carry a property observer. At best the combination is
+    // ambiguous; at worst the observer is silently dropped and *no preference
+    // ever persists* — a bug that only shows up after a relaunch, which is
+    // exactly when nobody is looking for it.
+    //
+    // So each preference is a private stored property, which `@Observable`
+    // tracks normally, behind a public computed property that persists on
+    // write. Reading the facade registers access to the stored property, so
+    // SwiftUI still redraws; the call sites are unchanged.
+    //
+    // This is the same shape as the `lazy`-inside-`@Observable` problem
+    // already recorded in `AppContainer`: the macro does not leave stored
+    // properties alone, and anything relying on them being stored breaks
+    // quietly.
+
+    private var storedTheme: Theme
     public var theme: Theme {
-        didSet { defaults.set(theme.id, forKey: Key.theme) }
+        get { storedTheme }
+        set {
+            storedTheme = newValue
+            defaults.set(newValue.id, forKey: Key.theme)
+        }
     }
 
     /// A preference, and only a preference.
@@ -56,19 +86,32 @@ public final class Preferences {
     /// percentile is a fact about the person, and letting the first move the
     /// second corrupts a figure meant to describe reality. Goal *progress* is
     /// carried in the `HealthBrief` so she may state it.
+    private var storedGoals: Goals
     public var goals: Goals {
-        didSet {
-            guard let data = try? JSONEncoder().encode(goals) else { return }
+        get { storedGoals }
+        set {
+            storedGoals = newValue
+            guard let data = try? JSONEncoder().encode(newValue) else { return }
             defaults.set(data, forKey: Key.goals)
         }
     }
 
+    private var storedMorningBriefEnabled: Bool
     public var morningBriefEnabled: Bool {
-        didSet { defaults.set(morningBriefEnabled, forKey: Key.morningBrief) }
+        get { storedMorningBriefEnabled }
+        set {
+            storedMorningBriefEnabled = newValue
+            defaults.set(newValue, forKey: Key.morningBrief)
+        }
     }
 
+    private var storedMorningBriefHour: Int
     public var morningBriefHour: Int {
-        didSet { defaults.set(morningBriefHour, forKey: Key.morningBriefHour) }
+        get { storedMorningBriefHour }
+        set {
+            storedMorningBriefHour = newValue
+            defaults.set(newValue, forKey: Key.morningBriefHour)
+        }
     }
 
     /// Shown in Settings so "I have a backup" can be checked rather than

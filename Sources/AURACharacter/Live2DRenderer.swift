@@ -53,10 +53,10 @@ public final class Live2DRenderer: CharacterRenderer {
     /// - Parameter directory: holds `.model3.json`, `.moc3`, `.physics3.json`
     ///   and the texture atlas, exactly as the artist delivered them.
     public init(directory: URL) throws {
-        guard let handle = CubismModelHandle(directory: directory.path) else {
-            throw CharacterError.modelUnreadable(directory)
-        }
-        self.model = handle
+        // `initWithDirectory:error:` imports as throwing, so the bridge's
+        // reason — a missing file, or a Core too old for this rig — reaches the
+        // caller instead of collapsing into "unreadable".
+        self.model = try CubismModelHandle(directory: directory.path)
     }
 
     /// True once an `MTKView` is driving frames, so the fallback timer stands
@@ -289,6 +289,16 @@ public struct Live2DStageView: NSViewRepresentable {
 }
 #endif
 
+/// Nothing throws these any more.
+///
+/// `modelUnreadable` was thrown when the bridge returned nil without saying
+/// why; the bridge now throws an `NSError` carrying the actual reason, which is
+/// strictly better. `missingParameter` was always documentation — a rig missing
+/// a parameter is reported by `CharacterManifest.missingParameters()` at
+/// install time, which is the point at which it can still be fixed.
+///
+/// Kept rather than deleted: both name real failure modes, and a caller that
+/// wants to classify rather than display needs something to match on.
 public enum CharacterError: Error, Sendable, LocalizedError {
     case modelUnreadable(URL)
     /// The rig is missing a parameter the renderer drives.

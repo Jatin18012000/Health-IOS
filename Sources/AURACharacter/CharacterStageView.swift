@@ -96,8 +96,11 @@ public struct CharacterStageView: View {
             live2d.apply(state: state, mood: mood)
             rig = .loaded(live2d)
         } catch {
-            rig = .failed((error as? LocalizedError)?.errorDescription
-                          ?? "the rig could not be opened")
+            // `localizedDescription`, not a cast to `LocalizedError`: the
+            // bridge throws an `NSError`, which does not conform to it, so the
+            // cast would fail and swallow the one useful sentence — including
+            // "the SDK is too old", which is the likeliest failure of all.
+            rig = .failed(error.localizedDescription)
         }
         #endif
     }
