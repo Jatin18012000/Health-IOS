@@ -71,7 +71,38 @@ File → Export Physics Settings. Physics is **included in the free tier**, so
 this costs nothing but an evening. It does not require going back to the
 supplier.
 
-## Missing #2 — the `CubismBridge` target does not exist
+## ~~Missing #2~~ — PARTIALLY RESOLVED: the target exists, unbuilt
+
+`Sources/CubismBridge/` now holds a pure-Objective-C header and an Objective-C++
+implementation wrapping `CubismUserModel`, and `Live2DStageView` has a real
+`MTKViewDelegate` render loop instead of an empty `updateNSView`.
+
+`Package.swift` **detects** the SDK rather than requiring it: `swift build`
+behaves exactly as before on a machine without it, and starts compiling the
+bridge the moment `Vendor/CubismSDK/Core/include/Live2DCubismCore.h` appears.
+Declaring the targets unconditionally would have turned a working build into a
+broken one for anyone without a proprietary download, CI included.
+
+**None of it has been compiled.** There is no Swift toolchain and no Cubism SDK
+in the environment it was written in. The call shapes were read from Live2D's
+published Framework headers rather than recalled — `CubismUserModel`,
+`CubismModelSettingJson`, `CubismModel`, `CubismRenderer_Metal` — but reading a
+header is not compiling against one. Expect real errors on the first build. The
+likeliest:
+
+- `MTKViewDelegate` is not `@MainActor`, and Swift 6 strict concurrency will
+  probably object to the `@MainActor` `Coordinator` conforming to it.
+- The `exclude:` list for the Framework's non-Metal renderers is written from
+  the SDK's usual layout and may not match 5.3 exactly.
+- Linking a vendored `.a` uses `unsafeFlags`, which SwiftPM permits only in a
+  root package. Fine today; it is what breaks if AURA ever becomes a dependency.
+
+Still to do, in order: `tools/setup_cubism.sh` to confirm the layout, then
+`swift build`, then work the errors.
+
+The original finding, kept for the record:
+
+### The problem as found
 
 This is the real blocker, and it predates this delivery.
 

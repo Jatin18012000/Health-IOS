@@ -43,3 +43,9 @@ apple_health_export/
 *.gguf
 *.mlmodelc/
 Models/
+
+# The Cubism SDK is a proprietary download tied to a licence agreement and an
+# account. It cannot be redistributed, so it is fetched per-machine and the
+# package detects it rather than requiring it — see Package.swift and
+# Vendor/README.md.
+/Vendor/CubismSDK/
