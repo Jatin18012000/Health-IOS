@@ -198,6 +198,50 @@ convenience.
 
 ---
 
+## 11. The percentage scale on synced data is unverified
+
+`HKUnit.percent()` is a **fraction**: blood oxygen comes back as 0.97, not 97.
+`HealthKitUnits` stores it as-is, reasoning that Apple's own XML exporter writes
+canonical HealthKit values, so `unit="%" value="0.97"` is what the existing
+years in the store already hold and the two paths agree by construction.
+
+**Nothing in this repository pins that.** The reference export contained six
+`OxygenSaturation` records in four years, the edge-case fixture has none, and
+`tools/reference_pipeline.py` does not special-case percent. So the reasoning is
+sound and untested, which is exactly the shape of the `Cal`-means-kilocalorie
+bug that this project already has a comment warning about.
+
+Provisional answer: **leave it, and check on the first real sync.** Import an
+XML export covering a day the phone also synced, and compare the two blood
+oxygen figures. If one reads 0.97 and the other 97, the fix is one line in
+`HealthKitUnits.hkUnit(for:)` and a note in the fixture so it never comes back.
+
+The cheap permanent fix, if you want it: add a percentage metric to
+`Tests/Fixtures/edge-cases/export.xml` with a hand-checked value. Then both
+implementations assert the scale and neither can drift.
+
+---
+
+## 12. The companion is the one thing that is not free
+
+`docs/COST.md` commits to this project costing nothing, and everything else
+honours that. The iOS companion cannot.
+
+| Option | Cost | What you get |
+|---|---|---|
+| Free Apple ID | £0 | App expires after **7 days**, re-sign from Xcode each time |
+| Apple Developer Program | **$99/year** | Stays installed, background delivery works |
+| **Keep exporting by hand** | £0 | Two minutes a month, and the path that already works |
+
+Provisional answer: **build it, do not pay for it yet.** The code is written and
+the seven-day install is enough to find out whether automatic sync is worth
+having. If after a month the manual export has not annoyed you, the answer is
+that $99/year buys a convenience you do not need — and `VERDICT.md` was right
+that manual import is not a limitation of the approach on macOS, it is the only
+option that exists.
+
+---
+
 ## Already decided (recorded so they don't get reopened)
 
 - **Local-only, no App Store** — `docs/COST.md`
