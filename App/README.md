@@ -10,18 +10,25 @@ One-time setup, once you're on the Mac:
 1. Xcode → New Project → macOS → App, named `AURA`, at `App/AURA/`.
 2. File → Add Package Dependencies → Add Local → choose the repository root.
 3. Link `AURACore`, `AURAStore`, `AURAIngest`, `AURAAnalytics`,
-   `AURAIntelligence`, `AURAMemory`, `AURAReport`, `AURAVoice`,
-   `AURACharacter`, `AURADesign` — every package. The shell reaches all of
-   them now that Settings carries the report and the backup.
+   `AURAIntelligence`, `AURAMemory`, `AURAReport`, `AURASync`, `AURAVoice`,
+   `AURACharacter`, `AURADesign` — every package except `AURAHealthKit`,
+   which is the phone's. The shell reaches all of them now that Settings
+   carries the report, the backup and phone sync.
 4. Signing & Capabilities → App Sandbox → enable **Audio Input** and
    **User Selected File** read access. The import screen needs the latter for
    both the file panel and the drop target; without it a dropped folder reads
    as empty rather than as denied, which looks like a broken importer.
-5. Link **`CubismBridge`** too, but only once `Vendor/CubismSDK` exists —
+5. Sandbox also needs **Incoming Connections (Server)** and **Outgoing
+   Connections (Client)** for phone sync, plus
+   **`NSLocalNetworkUsageDescription`** and an `NSBonjourServices` entry of
+   `_aura-sync._tcp` in Info.plist. Without them the listener starts and no
+   phone ever finds it, with no error on either side. Skip all of this if you
+   are not using the companion — see `App/AURACompanion/README.md`.
+6. Link **`CubismBridge`** too, but only once `Vendor/CubismSDK` exists —
    see `Vendor/README.md` and run `tools/setup_cubism.sh` first. Without the
    SDK the target does not exist and the app draws the procedural placeholder,
    which is the normal state.
-6. Add **`NSMicrophoneUsageDescription`** to Info.plist. Without it the app
+7. Add **`NSMicrophoneUsageDescription`** to Info.plist. Without it the app
    does not prompt for the microphone — it crashes the moment the audio engine
    starts, which looks like a bug in the talk button rather than a missing key.
    Something like: *"AURA transcribes what you say on this device. No audio
