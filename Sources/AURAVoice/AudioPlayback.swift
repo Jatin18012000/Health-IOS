@@ -36,7 +36,7 @@ final class AudioPlayback: @unchecked Sendable {
         levelHandler = onLevel
         try start(format: format)
 
-        for buffer in buffers { player.scheduleBuffer(buffer, at: nil) }
+        scheduleAll(buffers)
         player.play()
 
         let duration = buffers.reduce(0.0) {
@@ -79,6 +79,28 @@ final class AudioPlayback: @unchecked Sendable {
     }
 
     var isPlaying: Bool { player.isPlaying }
+
+    /// Deliberately *not* `async`.
+    ///
+    /// The newest SDK adds an `async` `scheduleBuffer` overload whose default
+    /// `completionCallbackType` is `.dataPlayedBack` — it suspends until that
+    /// specific buffer has finished *playing*, not until it is merely
+    /// enqueued. Swift prefers an async overload over a sync one, but only
+    /// when the call site itself sits inside an `async` function; calling
+    /// `scheduleBuffer` from `play(_:onLevel:)` directly resolved to the new
+    /// overload. Awaiting it there would have been worse than a stutter: the
+    /// original code schedules every buffer *before* calling `player.play()`,
+    /// so the first `await` would hang forever waiting for playback that
+    /// hasn't started yet. Even scheduled after `play()`, per-buffer
+    /// completion awaiting serializes ~1024-frame buffers with an audible gap
+    /// between each — a live, unresolved report on Apple's own developer
+    /// forums (thread 817029). Isolating the loop in this ordinary
+    /// synchronous method keeps the call site out of `async` context, so it
+    /// resolves to the original fire-and-forget overload this file's design
+    /// (gapless, schedule-then-play) depends on.
+    private func scheduleAll(_ buffers: [AVAudioPCMBuffer]) {
+        for buffer in buffers { player.scheduleBuffer(buffer, at: nil) }
+    }
 
     // MARK: - Engine
 
