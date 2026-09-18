@@ -95,6 +95,8 @@ let package = Package(
         .library(name: "AURAIntelligence", targets: ["AURAIntelligence"]),
         .library(name: "AURAVoice",        targets: ["AURAVoice"]),
         .library(name: "AURACharacter",    targets: ["AURACharacter"]),
+        .library(name: "AURASync",         targets: ["AURASync"]),
+        .library(name: "AURAHealthKit",    targets: ["AURAHealthKit"]),
         .library(name: "AURADesign",       targets: ["AURADesign"]),
     ],
     dependencies: [
@@ -168,6 +170,20 @@ let package = Package(
             .product(name: "Kokoro", package: "kokoro-swift"),
         ]),
 
+        // Local-network sync between the phone and the Mac.
+        //
+        // No AURAStore dependency on purpose: transport has no business
+        // importing persistence, and keeping them apart is what lets the codec
+        // and the framing be tested without a database. The Mac hands it a
+        // closure that knows how to ingest.
+        .target(name: "AURASync", dependencies: ["AURACore"]),
+
+        // Reads HealthKit on the phone. Every file is inside
+        // `#if canImport(HealthKit)`, so the target still compiles on macOS
+        // where the framework does not exist — which is what keeps
+        // `swift build` working on the Mac that has to build everything else.
+        .target(name: "AURAHealthKit", dependencies: ["AURACore"]),
+
         // The companion: mood state machine, sprite renderer, Live2D seam.
         //
         // `CubismBridge` is in this list only when the SDK is vendored; see the
@@ -192,6 +208,7 @@ let package = Package(
             "AURAReport", "AURACore", "AURAAnalytics", "AURAMemory",
         ]),
         .testTarget(name: "AURAVoiceTests",  dependencies: ["AURAVoice"]),
+        .testTarget(name: "AURASyncTests",   dependencies: ["AURASync", "AURACore"]),
         .testTarget(name: "AURADesignTests", dependencies: ["AURADesign"]),
     ] + cubismTargets
 )

@@ -3,6 +3,7 @@ import AppKit
 import AURACore
 import AURADesign
 import AURAStore
+import AURASync
 
 /// Preferences, and the two ways data leaves this Mac on purpose.
 ///
@@ -14,13 +15,36 @@ public struct SettingsView: View {
     @State private var model: SettingsViewModel
     private let preferences: Preferences
     private let status: [StatusLine]
+    private let sync: SyncControls?
 
     public init(model: SettingsViewModel,
                 preferences: Preferences,
-                status: [StatusLine] = []) {
+                status: [StatusLine] = [],
+                sync: SyncControls? = nil) {
         _model = State(wrappedValue: model)
         self.preferences = preferences
         self.status = status
+        self.sync = sync
+    }
+
+    /// Enough to drive the sync panel without handing this view the whole app
+    /// container. The listener's lifetime belongs to `AppContainer`; this only
+    /// starts it, stops it, and shows what it is doing.
+    public struct SyncControls {
+        public let state: SyncServer.State
+        public let lastReceipt: SyncProtocol.Receipt?
+        public let start: @MainActor () async -> String?
+        public let stop: @MainActor () async -> Void
+
+        public init(state: SyncServer.State,
+                    lastReceipt: SyncProtocol.Receipt?,
+                    start: @escaping @MainActor () async -> String?,
+                    stop: @escaping @MainActor () async -> Void) {
+            self.state = state
+            self.lastReceipt = lastReceipt
+            self.start = start
+            self.stop = stop
+        }
     }
 
     /// One component and whether it is actually working, as opposed to
@@ -56,6 +80,7 @@ public struct SettingsView: View {
                     morningBrief
                     report
                     backup
+                    if sync != nil { phoneSync }
                     if !status.isEmpty { components }
                     storage
                 }
@@ -236,6 +261,95 @@ public struct SettingsView: View {
                     .font(.system(size: 10.5))
                     .foregroundStyle(theme.textSecondary.opacity(0.75))
                     .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    // MARK: Phone sync
+
+    @ViewBuilder
+    private var phoneSync: some View {
+        if let sync {
+            GlassPanel {
+                VStack(alignment: .leading, spacing: 12) {
+                    PanelLabel("Sync from your iPhone")
+                    Text("HealthKit doesn't exist on macOS, so this Mac can only be given data. The companion app reads what's new on your phone and sends it over your local network — nothing goes anywhere else.")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(theme.textSecondary.opacity(0.75))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    switch sync.state {
+                    case .stopped:
+                        Text("Listening is off. Start it, then type the code into the companion app.")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(theme.textSecondary)
+                        action("Start listening") {
+                            // The code is read off `sync.state` once the
+                            // listener reports it, so the return value is
+                            // deliberately unused here.
+                            Task { _ = await sync.start() }
+                        }
+
+                    case .advertising(let code):
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Type this into the companion app")
+                                .font(.system(size: 11))
+                                .foregroundStyle(theme.textSecondary)
+                            Text(code)
+                                .font(.system(size: 30, weight: .medium, design: .monospaced))
+                                .tracking(6)
+                                .foregroundStyle(theme.primary)
+                                .textSelection(.enabled)
+                            // Said plainly because the alternative — a listener
+                            // running whether or not the app is open — is a
+                            // different and less welcome product.
+                            Text("Only while AURA is open. The code changes each time you start.")
+                                .font(.system(size: 10))
+                                .foregroundStyle(theme.textSecondary.opacity(0.7))
+                        }
+                        action("Stop listening", prominent: false) {
+                            Task { await sync.stop() }
+                        }
+
+                    case .receiving(let device):
+                        HStack(spacing: 9) {
+                            ProgressView().controlSize(.small).tint(theme.primary)
+                            Text("Receiving from \(device)")
+                                .font(.system(size: 12.5))
+                                .foregroundStyle(theme.textPrimary)
+                        }
+
+                    case .failed(let reason):
+                        Text(reason)
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(theme.accent)
+                            .fixedSize(horizontal: false, vertical: true)
+                        action("Try again") { Task { _ = await sync.start() } }
+                    }
+
+                    if let receipt = sync.lastReceipt {
+                        Divider().overlay(theme.surfaceStroke)
+                        // Counts, not "synced" — the same reason the import
+                        // screen reports them. Most of a sync being data this
+                        // Mac already had is the pipeline working.
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 10))
+                                .foregroundStyle(theme.secondary)
+                            Text(receipt.stored == 0
+                                 ? "Last sync added nothing new"
+                                 : "Last sync added \(receipt.stored.formatted()) readings")
+                                .font(.system(size: 11))
+                                .foregroundStyle(theme.textSecondary)
+                            if receipt.duplicates > 0 {
+                                Text("· \(receipt.duplicates.formatted()) already here")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(theme.textSecondary.opacity(0.7))
+                            }
+                            Spacer()
+                        }
+                    }
+                }
             }
         }
     }

@@ -7,6 +7,7 @@ import AURADesign
 import AURAIntelligence
 import AURAVoice
 import AURAMemory
+import AURASync
 
 /// The app shell. Deliberately thin — views and wiring only.
 ///
@@ -180,7 +181,12 @@ struct RootView: View {
                                          memory: container.memory,
                                          preferences: container.preferences),
                 preferences: container.preferences,
-                status: container.componentStatus())
+                status: container.componentStatus(),
+                sync: SettingsView.SyncControls(
+                    state: container.syncState,
+                    lastReceipt: container.lastSyncReceipt,
+                    start: { await container.startSync() },
+                    stop: { await container.stopSync() }))
         }
     }
 
@@ -340,6 +346,7 @@ final class AppContainer {
     @ObservationIgnored private(set) var keeper: MemoryKeeper?
     @ObservationIgnored private var conversationModel: ConversationViewModel?
     @ObservationIgnored private var scheduler: MorningBriefScheduler?
+    @ObservationIgnored private var syncServer: SyncServer?
 
     /// Which renderer the character screen should use, and where its assets
     /// are. `.placeholder` until a rig is installed, which is most of this
@@ -349,6 +356,20 @@ final class AppContainer {
     /// Set when she has something worth saying unprompted. Nil the rest of the
     /// time, which is nearly always.
     private(set) var morningBrief: MorningBrief.Outcome?
+
+    /// What the phone-sync listener is doing, mirrored for the UI.
+    ///
+    /// `SyncServer` is an actor and the Settings screen is not, so its state
+    /// arrives here through a callback rather than being read across the
+    /// isolation boundary on every redraw.
+    private(set) var syncState: SyncServer.State = .stopped
+
+    /// The last thing a phone actually delivered.
+    ///
+    /// Kept so Settings can report a count rather than "synced" — the same
+    /// reason the import screen reports counts. "Synced" tells you nothing
+    /// about whether anything landed.
+    private(set) var lastSyncReceipt: SyncProtocol.Receipt?
 
     /// Facts waiting for a yes or no. Shown as a badge, because an unconfirmed
     /// inference does nothing until it is answered.
@@ -498,6 +519,75 @@ final class AppContainer {
 
     func dismissMorningBrief() { morningBrief = nil }
 
+    // MARK: Phone sync
+
+    /// Start listening for the companion, and return the code to show.
+    ///
+    /// Only while the app is open. A health companion that kept a background
+    /// listener alive so a phone could reach it is a different and less welcome
+    /// product — the same reasoning that keeps `MorningBriefScheduler` a timer
+    /// rather than a background task.
+    func startSync() async -> String? {
+        guard case .ready(let store) = status else { return nil }
+        await syncServer?.stop()
+
+        let server = SyncServer(
+            ingest: { [weak self] samples in
+                await self?.receive(samples, into: store)
+                    ?? SyncProtocol.Receipt(stored: 0, duplicates: 0,
+                                            failure: "AURA closed mid-sync")
+            },
+            onState: { [weak self] state in
+                Task { @MainActor in self?.syncState = state }
+            })
+        syncServer = server
+
+        do {
+            return try await server.start()
+        } catch {
+            syncState = .failed(error.localizedDescription)
+            return nil
+        }
+    }
+
+    func stopSync() async {
+        await syncServer?.stop()
+        syncServer = nil
+        syncState = .stopped
+    }
+
+    /// Samples off the wire go through exactly the path an import goes through.
+    ///
+    /// Not a shortcut into the database: `ingest` is what applies source
+    /// deduplication and idempotency, and `rebuildRollups` is what makes the
+    /// new days visible to the analytics. A sync that wrote rows directly would
+    /// be a second ingestion path, which is the thing this design exists to
+    /// avoid.
+    private func receive(_ samples: [Sample],
+                         into store: SQLiteHealthStore) async -> SyncProtocol.Receipt {
+        do {
+            let result = try await store.ingest(samples)
+            if let affected = result.affected {
+                try await store.rebuildRollups(for: affected)
+                latestDay = try await store.availableRange()?.end
+                // The conversation's brief is built for a day; a sync that
+                // added a newer one should not leave her answering about the
+                // old one.
+                conversationModel = nil
+            }
+            let receipt = SyncProtocol.Receipt(
+                stored: result.inserted, duplicates: result.duplicates,
+                rejected: result.rejected)
+            lastSyncReceipt = receipt
+            return receipt
+        } catch {
+            // Reported back to the phone rather than swallowed: the person
+            // holding it is the one who can do something about it.
+            return SyncProtocol.Receipt(stored: 0, duplicates: 0,
+                                        failure: error.localizedDescription)
+        }
+    }
+
     // MARK: Import and restore
 
     /// Records what an import changed.
@@ -552,6 +642,18 @@ final class AppContainer {
                       : "\(proposedFactCount) proposal\(proposedFactCount == 1 ? "" : "s") waiting",
                   isReady: memory != nil),
         ]
+
+        lines.append(.init(
+            label: "Phone sync",
+            detail: {
+                switch syncState {
+                case .stopped: "off — start it below to pair a phone"
+                case .advertising: "waiting for a phone on this network"
+                case .receiving(let device): "receiving from \(device)"
+                case .failed(let reason): reason
+                }
+            }(),
+            isReady: syncState != .stopped))
 
         let missing = characterManifest.missingParameters()
         switch characterManifest.renderer {
