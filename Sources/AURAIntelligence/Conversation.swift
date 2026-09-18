@@ -40,7 +40,13 @@ public actor Conversation {
             let brief = try await briefBuilder.brief(for: day)
             let buffer = SentenceBuffer(brief: brief)
 
-            func emit(_ releases: [SentenceStream.Release]) {
+            // A closure value, not a local `func`: it is captured by the
+            // `@Sendable` token callback passed to `model.complete` below, and
+            // a local function captured that way must itself be `@Sendable` --
+            // Swift does not infer that for `func` declarations. `onEvent` is
+            // already `@Sendable`, so the closure body is fine as written; only
+            // the declaration form needed to change.
+            let emit: @Sendable ([SentenceStream.Release]) -> Void = { releases in
                 for release in releases {
                     switch release {
                     case .allow(let sentence, let citations):

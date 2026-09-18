@@ -33,9 +33,8 @@ public final class MLXModel: LanguageModel, @unchecked Sendable {
     public let identifier: String
     public private(set) var isReady = false
 
-    private var container: ModelContainer?
     private let maxTokens: Int
-    private let loadLock = NSLock()
+    private let loader = ModelLoader()
 
     /// - Parameters:
     ///   - identifier: a Hugging Face repo id, e.g. `mlx-community/Qwen3-14B-4bit`.
@@ -85,18 +84,17 @@ public final class MLXModel: LanguageModel, @unchecked Sendable {
     // MARK: - Loading
 
     private func loadedContainer() async throws -> ModelContainer {
-        if let container { return container }
-
-        // Serialised: two screens asking a question at once must not both
-        // start loading nine gigabytes of weights.
-        loadLock.lock()
-        defer { loadLock.unlock() }
-        if let container { return container }
-
         do {
-            let loaded = try await LLMModelFactory.shared.loadContainer(
-                configuration: ModelConfiguration(id: identifier))
-            container = loaded
+            let loaded = try await loader.container(identifier: identifier)
+            // Written redundantly by every caller whose await resolves
+            // against the same already-finished load, always to the same
+            // value. Technically still a race on this one Bool by the
+            // language's formal memory model; not worth an actor hop or a
+            // lock to close, since `isReady` has to stay a plain, instantly
+            // readable property for the UI's status dot (`LanguageModel`
+            // requires `var isReady: Bool { get }`, not `async`) and the
+            // actual hazard -- a lock held across the multi-second weight
+            // load below -- is what actually mattered and is gone.
             isReady = true
             return loaded
         } catch {
@@ -105,6 +103,34 @@ public final class MLXModel: LanguageModel, @unchecked Sendable {
             throw ModelError.weightsMissing(
                 "\(identifier): \(error.localizedDescription)")
         }
+    }
+}
+
+/// Loads the model weights at most once, however many callers ask before the
+/// first load finishes.
+///
+/// An actor, not a lock. The previous version held an `NSLock` across
+/// `await LLMModelFactory.shared.loadContainer(...)` -- a load that can take
+/// tens of seconds for several gigabytes of weights. That is a real deadlock
+/// and priority-inversion risk on its own, not merely the compile error
+/// Swift 6 happens to catch first (`.lock()`/`.unlock()` are unavailable from
+/// an async context precisely because holding an OS lock across a suspension
+/// point is unsafe). An actor serialises callers by suspending them at the
+/// `await`, never by blocking a thread underneath a held lock, which is what
+/// "load once, and let concurrent callers join the same in-flight load"
+/// actually needs. `Task.value` is itself safe to await from multiple
+/// callers, so once the task exists there is nothing left to guard.
+private actor ModelLoader {
+    private var inFlight: Task<ModelContainer, Error>?
+
+    func container(identifier: String) async throws -> ModelContainer {
+        if let inFlight { return try await inFlight.value }
+        let started = Task {
+            try await LLMModelFactory.shared.loadContainer(
+                configuration: ModelConfiguration(id: identifier))
+        }
+        inFlight = started
+        return try await started.value
     }
 }
 #endif

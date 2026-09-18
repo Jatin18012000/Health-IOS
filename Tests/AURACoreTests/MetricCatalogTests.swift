@@ -92,7 +92,11 @@ struct SourceResolverTests {
     @Test("an unknown source sorts last rather than being dropped")
     func unknownSource() {
         let resolver = SourceResolver.default
-        #expect(resolver.rank(of: "SomeNewBand") == Int.max)
+        // 99, not some arbitrarily large sentinel: this exact value is what
+        // `tools/reference_pipeline.py` writes and what `expected.json`
+        // asserts, and it is what ends up in the `sources.priority` column —
+        // see `SourceResolver.unknownRank`.
+        #expect(resolver.rank(of: "SomeNewBand") == SourceResolver.unknownRank)
         let total = resolver.total(of: [sample("SomeNewBand", 250, 0, 60)])
         #expect(total == 250)
     }

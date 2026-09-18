@@ -27,6 +27,12 @@ download. Ships first so she can talk in week three. It sounds like a system
 voice, and it will not give you the companion feeling — but having her speak
 early is what tells you whether the rest of the illusion is working.
 
+> **Not currently linked.** `kokoro-swift` publishes one version, which
+> depends on a package with no stable release; SwiftPM refuses that and
+> resolution fails before anything compiles. Removed from `Package.swift` so
+> the rest of the project could build at all — the code below is unchanged and
+> behind `#if canImport(Kokoro)`. `docs/DECISIONS_PENDING.md` §13.
+
 **2. `NeuralVoice` — Kokoro-82M, via `kokoro-swift`.** Apache 2.0 for both the
 model and the code. Still entirely offline, dramatically warmer, and the upgrade
 that actually matters.

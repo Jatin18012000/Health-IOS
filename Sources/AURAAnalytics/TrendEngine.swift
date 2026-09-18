@@ -100,7 +100,7 @@ public struct TrendEngine: Sendable {
         public let metric: String
         public let title: String
         public let value: Double
-        public let unit: Unit
+        public let unit: AURACore.Unit
         /// 0...1 against this person's own baseline window, inverted for
         /// metrics where lower is better.
         public let personalPercentile: Double?

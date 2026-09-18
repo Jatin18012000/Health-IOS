@@ -19,7 +19,7 @@ There is exactly one line item that can cost money, and it is optional.
 | Structured extraction | Apple Foundation Models | Free, built into macOS 26 |
 | Speech to text | WhisperKit | MIT |
 | Text to speech (v1) | AVSpeechSynthesizer | Free, built into macOS |
-| Text to speech (v2) | Kokoro-82M via kokoro-swift | Apache 2.0 — model *and* code |
+| Text to speech (v2) | ~~Kokoro-82M via kokoro-swift~~ | **not currently linked** — its only published version depends on an unstable package and SwiftPM refuses it. See `docs/DECISIONS_PENDING.md` §13 |
 | Charts | Swift Charts | Free, built into macOS |
 | Character rigging | Live2D Cubism SDK | **Free below ¥10M (~£50k) annual revenue** |
 | Character rigging (alt) | Inochi2D / Inochi Creator | Open source, unrestricted |

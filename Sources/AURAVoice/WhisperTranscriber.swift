@@ -64,10 +64,17 @@ public final class WhisperTranscriber: TranscriptionEngine, @unchecked Sendable 
         guard !isListening else { return }
         try await prepare()
 
-        lock.lock()
-        samples.removeAll(keepingCapacity: true)
-        levelHandler = onLevel
-        lock.unlock()
+        // .lock()/.unlock() as separate calls are unavailable from async
+        // contexts (Swift can no longer prove no suspension point falls
+        // between them, which would hold the lock across an await and risk a
+        // deadlock or priority inversion). `withLock`'s closure is a plain
+        // synchronous throwing closure -- an `await` inside it would not
+        // compile -- so it structurally cannot have that problem, which is
+        // why it is the exempted, recommended replacement.
+        lock.withLock {
+            samples.removeAll(keepingCapacity: true)
+            levelHandler = onLevel
+        }
 
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
@@ -87,9 +94,14 @@ public final class WhisperTranscriber: TranscriptionEngine, @unchecked Sendable 
                   let converted = Self.convert(buffer, using: converter, to: targetFormat)
             else { return }
 
-            self.lock.lock()
-            self.samples.append(contentsOf: Self.floats(of: converted))
-            self.lock.unlock()
+            // This closure is the AVAudioEngine tap callback -- a plain
+            // synchronous closure, even though it is written inside an async
+            // function -- so `.lock()/.unlock()` are not actually restricted
+            // here. Converted to `withLock` anyway, for one pattern rather
+            // than two doing the same job.
+            self.lock.withLock {
+                self.samples.append(contentsOf: Self.floats(of: converted))
+            }
 
             if let level = Self.rms(of: converted) {
                 self.levelHandler?(level)
@@ -110,10 +122,11 @@ public final class WhisperTranscriber: TranscriptionEngine, @unchecked Sendable 
         guard isListening else { return "" }
         teardown()
 
-        lock.lock()
-        let captured = samples
-        samples.removeAll(keepingCapacity: true)
-        lock.unlock()
+        let captured = lock.withLock { () -> [Float] in
+            let taken = samples
+            samples.removeAll(keepingCapacity: true)
+            return taken
+        }
 
         // Whisper hallucinates confidently on near-silence — a held key with
         // nothing said comes back as "Thank you." or a stray subtitle line.
@@ -129,9 +142,9 @@ public final class WhisperTranscriber: TranscriptionEngine, @unchecked Sendable 
     public func cancelListening() {
         guard isListening else { return }
         teardown()
-        lock.lock()
-        samples.removeAll(keepingCapacity: true)
-        lock.unlock()
+        lock.withLock {
+            samples.removeAll(keepingCapacity: true)
+        }
     }
 
     private func teardown() {

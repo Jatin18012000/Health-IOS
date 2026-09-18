@@ -242,6 +242,46 @@ option that exists.
 
 ---
 
+## 13. The neural voice is out, because it cannot be resolved
+
+The first `swift build` on the Mac produced **exactly one error**, and it was
+not a compile error — dependency resolution failed before a line of Swift was
+read:
+
+```
+'kokoro-swift' is required using a stable-version but
+'kokoro-swift' depends on an unstable-version package 'misaki'
+```
+
+`kokoro-swift` publishes one version, 0.1.0, which depends on a package with no
+stable release. SwiftPM refuses that combination and there is no newer version
+to move to. So one small unavailable package was hiding the entire project from
+the compiler.
+
+It has been removed from `Package.swift`. This cost the neural voice and
+nothing else: `NeuralVoice` sits behind `#if canImport(Kokoro)` and
+`VoiceFactory.speech` falls back to `SystemVoice`, which is precisely what that
+guard was written for. She still talks; she talks in Apple's voice.
+
+| Option | Cost |
+|---|---|
+| **Current: removed** | System voice instead of Kokoro-82M |
+| Pin to a branch or revision | Keeps the feature, but unreproducible builds against a moving target on an early-stage project |
+| Fork and vendor it | Keeps the feature, adds a fork to maintain |
+| Wait for a stable release | Free, and may never happen |
+
+Provisional answer: **leave it out until the rest compiles.** The immediate
+goal is to find out what else is broken across ~11,000 lines that have never
+been near a compiler, and one unresolvable dependency should not go on hiding
+all of it. Revisit once the build is clean — `docs/VOICE.md` records why the
+neural voice was wanted, and adding it back is one line.
+
+Worth noting for the record: this is the risk that was flagged *before* the
+build ran. Of the four dependencies, `kokoro-swift` was the one called out as
+the smallest and least established, and it is the one that failed.
+
+---
+
 ## Already decided (recorded so they don't get reopened)
 
 - **Local-only, no App Store** — `docs/COST.md`

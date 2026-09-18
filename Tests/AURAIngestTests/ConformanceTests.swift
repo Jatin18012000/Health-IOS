@@ -176,7 +176,13 @@ struct ConformanceTests {
             }
             // The union, never the sum: the InBed interval contains every stage
             // inside it, so adding durations counts the same minutes repeatedly.
-            #expect(abs(n.inBedMinutes - e.in_bed_min) < 0.1, e._why ?? "")
+            // `"\(...)"`, not the bare `e._why ?? ""` this used to be: `#expect`'s
+            // comment parameter is `Comment?`, which is `ExpressibleByStringLiteral`
+            // -- convertible from literal syntax, never from a plain `String`
+            // value. `e._why ?? ""` is an ordinary expression, not a literal, so
+            // it never qualifies; wrapping it in `"\()"` makes it one, matching
+            // the pattern already used two lines above for the same field.
+            #expect(abs(n.inBedMinutes - e.in_bed_min) < 0.1, "\(e._why ?? "")")
             #expect(abs(n.asleepMinutes - e.asleep_min) < 0.1)
             #expect(abs(n.coreMinutes - e.core_min) < 0.1)
             #expect(abs(n.deepMinutes - e.deep_min) < 0.1)

@@ -24,7 +24,7 @@ import HealthKit
 /// 1000x error on every distance sample.
 enum HealthKitUnits {
 
-    static func hkUnit(for unit: Unit) -> HKUnit? {
+    static func hkUnit(for unit: AURACore.Unit) -> HKUnit? {
         switch unit {
         case .count:            .count()
         case .kilometres:       .meterUnit(with: .kilo)

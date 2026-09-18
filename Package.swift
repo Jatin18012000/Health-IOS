@@ -112,10 +112,19 @@ let package = Package(
         // transcription, which push-to-talk does not need.)
         .package(url: "https://github.com/argmaxinc/WhisperKit", from: "0.9.0"),
 
-        // Local neural TTS. Apache 2.0, model and code both. 82M parameters and
-        // it runs on the Neural Engine, so it barely contends with the language
-        // model holding the GPU.
-        .package(url: "https://github.com/mweinbach/kokoro-swift", from: "0.1.0"),
+        // Local neural TTS (Kokoro-82M) is DELIBERATELY ABSENT — see
+        // docs/DECISIONS_PENDING.md §13. `kokoro-swift` publishes one version,
+        // 0.1.0, which depends on `misaki`, a package with no stable release.
+        // SwiftPM refuses that combination outright:
+        //
+        //   'kokoro-swift' is required using a stable-version but
+        //   'kokoro-swift' depends on an unstable-version package 'misaki'
+        //
+        // Resolution fails before a single line of Swift compiles, so this one
+        // unavailable package was hiding the entire project from the compiler.
+        // `NeuralVoice` sits behind `#if canImport(Kokoro)` and `VoiceFactory`
+        // falls back to `SystemVoice`, so its absence costs the neural voice
+        // and nothing else — which is what that guard was written for.
     ],
     targets: [
         // Domain vocabulary. Depends on nothing. Everything depends on it.
@@ -167,7 +176,6 @@ let package = Package(
         .target(name: "AURAVoice", dependencies: [
             "AURACore",
             .product(name: "WhisperKit", package: "WhisperKit"),
-            .product(name: "Kokoro", package: "kokoro-swift"),
         ]),
 
         // Local-network sync between the phone and the Mac.

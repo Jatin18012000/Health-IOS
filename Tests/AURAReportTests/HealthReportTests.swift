@@ -186,7 +186,10 @@ struct HealthReportTests {
         #expect(report.sleep.meanAsleepInBedOnly == 330)
         // (0.90 + 0.92 + 0.94) / 3. The in-bed-only nights have no efficiency
         // at all and must not be counted as zeroes.
-        #expect(report.sleep.meanEfficiencyStaged == 0.92)
+        // Not `== 0.92`: summing 0.90 + 0.92 + 0.94 in double precision lands
+        // on 0.9199999999999999, not 0.92 -- the same non-cancelling rounding
+        // as `Stats.pearson`'s test, not a bug in the average.
+        #expect(abs((report.sleep.meanEfficiencyStaged ?? 0) - 0.92) < 1e-9)
     }
 
     // MARK: Limitations — the paragraph that makes the table honest
