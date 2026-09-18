@@ -220,8 +220,13 @@ machine that happened to have the file.
 
 ### M8 — Polish · written, not yet compiled
 
-- ~~`NeuralVoice`~~ **written** — Kokoro-82M on the Neural Engine, so it barely
-  contends with the language model holding the GPU
+- ~~`NeuralVoice`~~ **written, and currently not linked** — Kokoro-82M on the
+  Neural Engine, so it barely contends with the language model holding the GPU.
+  `kokoro-swift`'s only published version depends on an unstable package and
+  SwiftPM refuses the combination, so it was removed from `Package.swift` to
+  let the rest of the project reach the compiler at all. The code stays behind
+  `#if canImport(Kokoro)` and she falls back to the system voice. See
+  `docs/DECISIONS_PENDING.md` §13.
 - ~~Additional themes~~ **written** — four, including a light one that needs an
   actual look before it ships
 - ~~Doctor-facing PDF export~~ **written** — deliberately containing no
