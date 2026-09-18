@@ -56,8 +56,12 @@ struct StatisticsTests {
 
     @Test("pearson recognises a perfect relationship")
     func pearson() {
-        #expect(Stats.pearson([1, 2, 3], [2, 4, 6]) == 1.0)
-        #expect(Stats.pearson([1, 2, 3], [6, 4, 2]) == -1.0)
+        // Not `== 1.0`: `sx * sy` is `sqrt(2) * sqrt(8)`, and the two square
+        // roots' double-precision rounding doesn't cancel back to exactly
+        // 4.0, so the real result is 0.9999999999999998, not 1.0. A perfect
+        // relationship is what this tests, not bit-exact IEEE 754 arithmetic.
+        #expect(abs(Stats.pearson([1, 2, 3], [2, 4, 6])! - 1.0) < 1e-9)
+        #expect(abs(Stats.pearson([1, 2, 3], [6, 4, 2])! - (-1.0)) < 1e-9)
         // No variance in one series means no relationship to measure.
         #expect(Stats.pearson([1, 1, 1], [1, 2, 3]) == nil)
         #expect(Stats.pearson([1, 2], [1, 2]) == nil)

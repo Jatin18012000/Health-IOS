@@ -32,6 +32,17 @@ public struct SourceResolver: Sendable {
     /// vanishing from the data.
     public var ranking: [(pattern: String, rank: Int)]
 
+    /// The sentinel `rank(of:)` returns for a source matching no entry in
+    /// `ranking`. Fixed at 99, not `Int.max`: `tools/reference_pipeline.py`'s
+    /// `source_priority()` uses 99 as its unknown-source value, this exact
+    /// number is written into `Tests/Fixtures/edge-cases/expected.json`
+    /// (the single definition of correct ingestion per `CLAUDE.md`), and
+    /// `SQLiteHealthStore` persists whatever this returns straight into the
+    /// `sources.priority` column both implementations share — `Int.max`
+    /// still sorts unknown sources last, but it disagrees with the reference
+    /// on the actual stored value.
+    public static let unknownRank = 99
+
     public static let `default` = SourceResolver(ranking: [
         ("Apple Watch", 0),
         ("iPhone",      1),
@@ -53,7 +64,7 @@ public struct SourceResolver: Sendable {
         for entry in ranking where normalised.contains(entry.pattern.lowercased()) {
             return entry.rank
         }
-        return .max
+        return Self.unknownRank
     }
 
     /// The deduplicated total for one day's worth of one cumulative metric.
