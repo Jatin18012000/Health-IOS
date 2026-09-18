@@ -278,7 +278,7 @@ public final class SQLiteHealthStore: HealthStore {
         else { return nil }
         return DailyMetric(
             day: day, metric: row[1], domain: domain,
-            unit: Unit(rawValue: row[3]), value: row[4],
+            unit: AURACore.Unit(rawValue: row[3]), value: row[4],
             min: row[5], max: row[6],
             sampleCount: row[7], sourceCount: row[8])
     }
