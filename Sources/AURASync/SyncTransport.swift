@@ -19,9 +19,16 @@ enum SyncSecurity {
         let keyData = key.withUnsafeBytes { DispatchData(bytes: $0) }
         let identity = Data("AURA".utf8).withUnsafeBytes { DispatchData(bytes: $0) }
 
+        // `sec_protocol_options_add_pre_shared_key` is a C API and takes
+        // `dispatch_data_t` (aka `__DispatchData`) -- the Objective-C class
+        // backing Dispatch's C interop, not Swift's `DispatchData` value type
+        // itself. `as __DispatchData` is the bridge; `keyData` is already a
+        // `DispatchData`, so casting it "as DispatchData" (with or without
+        // `any`, which does not apply to a concrete struct) was a no-op that
+        // never reached the type the C function actually declares.
         sec_protocol_options_add_pre_shared_key(
-            options.securityProtocolOptions, keyData as any DispatchData,
-            identity as any DispatchData)
+            options.securityProtocolOptions, keyData as __DispatchData,
+            identity as __DispatchData)
 
         // A TLS 1.3 suite, which is what PSK uses here. The older
         // `TLS_PSK_WITH_*` constants are Security-framework SSLCipherSuite
