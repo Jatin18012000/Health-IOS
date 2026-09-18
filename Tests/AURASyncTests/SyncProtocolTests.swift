@@ -131,7 +131,13 @@ struct SyncProtocolTests {
         for _ in 0..<200 {
             let code = SyncProtocol.pairingCode()
             #expect(code.count == 6)
-            #expect(code.allSatisfy(\.isNumber))
+            // Not `\.isNumber` directly: `#expect` rewrites its argument into
+            // nested closures for its failure messages, and that rewriting
+            // loses the compiler's ability to prove a bare key path converts
+            // to a non-throwing closure -- it demands `try` for a predicate
+            // that provably cannot throw. An explicit closure sidesteps the
+            // macro's rethrows inference entirely.
+            #expect(code.allSatisfy { $0.isNumber })
         }
     }
 
