@@ -114,7 +114,20 @@ public struct Sparkline: View {
         }
     }
 
-    static func points(_ values: [Double], in size: CGSize, baseline: Double?) -> [CGPoint] {
+    // `nonisolated`: `Sparkline` conforms to `View`, and the newest SDK makes
+    // a `View`-conforming type globally `@MainActor`-isolated by default --
+    // its whole surface, not just `body`, even for a static func that never
+    // touches UI state. `DesignTests.swift` calls these three directly to
+    // pin the geometry formula (see that file's own doc comment), and
+    // Swift Testing runs test functions off the main actor, so the runtime
+    // isolation check trapped with SIGTRAP
+    // (swift_task_checkIsolatedSwift -> dispatch_assert_queue_fail) the
+    // moment a test called `Sparkline.points` from a non-MainActor executor
+    // -- confirmed from the crash report's thread backtrace, not guessed.
+    // `body` calls these synchronously today and keeps doing so: a
+    // `nonisolated` sync function is callable without `await` from any
+    // actor, MainActor included.
+    nonisolated static func points(_ values: [Double], in size: CGSize, baseline: Double?) -> [CGPoint] {
         guard values.count > 1 else { return [] }
         let (lo, hi) = bounds(values, baseline: baseline)
         let span = max(hi - lo, 0.0001)
@@ -127,7 +140,7 @@ public struct Sparkline: View {
         }
     }
 
-    static func y(for value: Double, values: [Double], size: CGSize, baseline: Double?) -> CGFloat? {
+    nonisolated static func y(for value: Double, values: [Double], size: CGSize, baseline: Double?) -> CGFloat? {
         guard values.count > 1 else { return nil }
         let (lo, hi) = bounds(values, baseline: baseline)
         let span = max(hi - lo, 0.0001)
@@ -137,7 +150,7 @@ public struct Sparkline: View {
 
     /// Include the baseline in the extent, so the reference line can never fall
     /// outside the drawn area and silently disappear.
-    static func bounds(_ values: [Double], baseline: Double?) -> (Double, Double) {
+    nonisolated static func bounds(_ values: [Double], baseline: Double?) -> (Double, Double) {
         var all = values
         if let baseline { all.append(baseline) }
         return (all.min() ?? 0, all.max() ?? 1)
