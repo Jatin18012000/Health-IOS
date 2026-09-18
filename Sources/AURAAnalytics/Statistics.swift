@@ -82,8 +82,18 @@ public enum Stats {
 /// window covered a less active year) and moved nothing else, because HRV,
 /// resting heart rate and staged sleep have less than a year of history behind
 /// them. It will pay off for those components as the Watch accumulates history.
+/// All `let`, not `var`.
+///
+/// Swift 6 flags a mutable `static var` here as unsafe global shared state
+/// under strict concurrency -- correctly, since `AnalyticsConfig` has no
+/// actor isolation and these are read from every screen and from background
+/// tasks. Nothing in this codebase, tests included, ever assigns to one of
+/// these; they are constants that get changed by editing this file, not by
+/// the running program -- exactly how `BASELINE_DAYS` and the step goal were
+/// each changed earlier in this project. `let` says that plainly and is what
+/// the compiler's own fix-it suggests.
 public enum AnalyticsConfig {
-    public static var baselineDays = 365
+    public static let baselineDays = 365
 
     /// Below this many readings, no percentile is produced.
     ///
@@ -91,16 +101,16 @@ public enum AnalyticsConfig {
     /// is a number with no information in it. Widening `baselineDays` makes this
     /// *more* likely to bite rather than less: the window now advertises a year
     /// while a sensor that arrived last month still has only a month behind it.
-    public static var minBaselineSamples = 14
-    public static var comparisonDays = 30
-    public static var minCorrelationSamples = 30
-    public static var strongCorrelation = 0.5
-    public static var outlierZ = 3.5
+    public static let minBaselineSamples = 14
+    public static let comparisonDays = 30
+    public static let minCorrelationSamples = 30
+    public static let strongCorrelation = 0.5
+    public static let outlierZ = 3.5
     /// Below this share of a day elapsed, no composite score is published.
-    public static var partialDayThreshold = 0.9
+    public static let partialDayThreshold = 0.9
 
     /// PROVISIONAL. Not derived from anything — see DECISIONS_PENDING §2.
-    public static var scoreWeights: [ScoreComponent: Double] = [
+    public static let scoreWeights: [ScoreComponent: Double] = [
         .activity: 0.30, .sleep: 0.30, .heart: 0.20, .recovery: 0.20,
     ]
 
