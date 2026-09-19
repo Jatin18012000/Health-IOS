@@ -1,5 +1,5 @@
 {
-  "renderer": "live2d",
+  "renderer": "procedural",
   "assetPath": "live2d",
   "parameters": [
     "ParamAngleX",
