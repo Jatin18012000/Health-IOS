@@ -137,23 +137,42 @@ Worth knowing in advance, because that message does not obviously mean "your SDK
 is too old", and downloading whichever SDK a search result offers first is an
 easy way to lose an afternoon.
 
-## Cannot be verified here — the mouth
+## ~~Cannot be verified here~~ — CHECKED 19 September 2026: the mouth does not move at all
 
-`docs/LIVE2D_SETUP.md` calls this *the single most likely thing to be wrong with
-a commission and the easiest to miss, because it looks fine in any demo video*:
+`docs/LIVE2D_SETUP.md` called this *the single most likely thing to be wrong
+with a commission and the easiest to miss, because it looks fine in any demo
+video*, and anticipated one specific failure — a rig built for expression
+presets snapping between two mouth shapes instead of interpolating. The real
+finding is more fundamental than that.
 
-> Drag `ParamMouthOpenY` slowly from 0 to 1 and watch. A rig built for
-> expression presets often snaps between two mouth shapes, which is fine for
-> pre-recorded animation and wrong here.
+**`ParamMouthOpenY` was stepped from 0.00 to 1.00 in 21 steps of 0.05, each one
+screenshotted, in Cubism Editor (free mode) against the source
+`AURA_Live2D_Final.cmo3`** — the standalone Cubism Viewer has no manual
+parameter-scrubbing panel, so the source project was opened in the full editor
+instead; it should match the exported `.moc3` since the latter is built from
+it, though this was not confirmed byte-for-byte against the shipped runtime
+file.
 
-Her mouth is driven by a live audio amplitude stream, so **every intermediate
-value is used**. Whether this rig deforms smoothly across the range cannot be
-established from the files — it needs Cubism Viewer, or the renderer running.
+**The mouth mesh is visually identical at 0.00 and at 1.00.** There is no snap
+between two shapes because there is effectively only one shape shown across the
+entire range — the lips read as fully closed at every value tested.
+`ParamMouthForm` (smile/frown) shows the same non-response at its extremes.
 
-**Do this before building anything.** Open the model in Cubism Viewer (free),
-drag that one parameter slowly, and watch for snapping. It is five minutes, and
-it is the difference between discovering a re-rig is needed now or after the
-whole bridge is built.
+This is not a rendering or methodology problem: `ParamEyeLOpen` set to 0.0 in
+the same file closes the eye correctly and dramatically, so parameter-driven
+deformation works in general in this rig. The defect is specific to the mouth
+mesh's keyforms — whoever rigged this either never sculpted a real "open"
+shape into the `ParamMouthOpenY = 1.0` keyform, or the sculpt didn't get saved
+into it before export.
+
+**Practical consequence.** `AudioPlayback.rms` drives this parameter from live
+speech amplitude continuously. With the mouth mesh as delivered, that will not
+produce a lip-sync glitch — it will produce a character whose mouth never
+visibly opens while she talks, which reads as far more broken than an
+interpolation snap would have. This blocks real lip-sync entirely, not just
+its smoothness, and needs the mouth mesh re-sculpted at the open keyform —
+back to whoever authored the rig, the same way the missing physics did, since
+it is an art-authoring task rather than a code one.
 
 ---
 
@@ -182,11 +201,12 @@ it on screen rather than pre-emptively; re-exporting the atlas at 2048 from the
 
 ## What to do next, in order
 
-1. **Cubism Viewer check** on `ParamMouthOpenY` — five minutes, highest risk.
+1. ~~**Cubism Viewer check** on `ParamMouthOpenY`~~ — done; failed. The mouth
+   mesh needs re-sculpting at the open keyform before anything downstream is
+   worth building on top of it. This is now the highest-priority open item.
 2. **Add physics** from the `.cmo3` — free, one evening, fixes the static hair.
 3. **Download Cubism SDK for Native 5.3+**.
 4. **Build the `CubismBridge` target and the Metal render loop** — the long pole.
 
-Steps 1 and 2 are worth doing before 3 and 4. They need only the free editor,
-and if the mouth turns out to need a re-rig it is far better to know that before
-the bridge exists than after.
+Step 1 was worth doing before 3 and 4, and it paid off: it is far better to know
+the mouth needs a re-rig before the bridge exists than after.
