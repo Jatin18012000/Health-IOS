@@ -25,38 +25,49 @@ milestone-by-milestone structure was for.
 
 ## Where this actually is
 
-**Every milestone through M9 is written, and the rig has landed.** The app is
-reachable end to end on paper: import an export, read the dashboard, talk to
-her, confirm what she remembers, export a report, back it up.
+**Every milestone through M9 is written, `swift build` and `swift test` both
+pass clean on a real Mac, and the app is reachable end to end**: import an
+export, read the dashboard, talk to her, confirm what she remembers, export a
+report, back it up. The character on screen is the procedural renderer, not
+the Live2D rig — see M9.
 
-**None of the Swift has ever been compiled.** There is no toolchain in the
-environment it was written in. `swift build` on the Mac is the gate on all of
-it, and remains the single most informative thing that can happen to this
-project. ~10,500 lines of Swift and ~430 of Objective-C++ are waiting on it.
+**The first real compile found 11 things**, all fixed and merged: a dropped
+unresolvable dependency, Swift 6 concurrency errors (several genuine, one a
+real deadlock risk caught incidentally), an SDK API whose async overload would
+have hung or stuttered playback if used naively, a real correctness bug in
+`SourceResolver`'s unknown-source sentinel (diverged from the Python
+reference), and two test bugs asserting exact `Double` equality on
+non-bit-exact arithmetic. None of it touched the core health-data logic —
+dedup, unit aliasing, or the sleep-staging split were all correct on the first
+compile. Whether `CubismBridge` itself has compiled depends on whether the
+Cubism SDK is present at `Vendor/CubismSDK/` locally, which is a separate,
+unconfirmed step from the build run that got everything else green.
 
 ### What is actually verified, because it runs
 
 | Check | Result | Where |
 |---|---|---|
+| `swift build` | clean, all targets | local (Mac) |
+| `swift test` | **all suites pass**, zero failures | local (Mac) |
 | `tools/conformance.py` | **81/81** against the edge-case fixture | CI |
 | `tools/output_guard.py --self-test` | **13/13** worked examples | CI |
-| `tools/check_character.py` | **30/30** on the installed rig | CI |
+| `tools/check_character.py` | **30/30** while the rig was active; now reports "procedural, no rig to check" | CI |
 | `tools/setup_cubism.sh` | correct when the SDK is absent, complete, or partial | local |
 | `tools/reference_pipeline.py` on the real export | 664,397 samples, 1,450 days, 33.9 MB | local |
 | `tools/analytics.py` on the real export | score 62.8 for 13 Sep, components sane across 14 days | local |
+| Cubism Editor, `ParamMouthOpenY` scrubbed 0→1 in 21 steps | **failed** — mouth mesh doesn't deform; see M9 | local (Windows) |
 
-`.github/workflows/checks.yml` runs the first three on every push and pull
-request. It deliberately does **not** build the Swift: no Swift here has
-compiled, so a macOS job added today would go red with a backlog rather than
-report anything useful. Add it once `swift build` passes — it is one job, and
-from then on it is the gate this workflow cannot be.
+`.github/workflows/checks.yml` still runs only the Python suite — it has not
+been extended to run `swift build`/`swift test` in CI yet, so the green build
+above is a point-in-time local result, not a standing guarantee on every push.
+Adding that job is still open (see "What is left").
 
-### What is written but unverified
+### Test coverage, now executed rather than merely written
 
-**119 test cases across all ten targets**, none of which has executed. They
-encode intent — that staged and in-bed-only sleep never pool, that a NaN never
-reaches her mouth, that `dataSeries[4]` needs a fifth colour — and that intent
-is worth having written down. It is not the same as passing.
+**119 test cases across all ten targets, all passing** as of the first clean
+`swift test` run. They encode intent — that staged and in-bed-only sleep never
+pool, that a NaN never reaches her mouth, that `dataSeries[4]` needs a fifth
+colour — and it is now backed by a real run, not just the writing.
 
 | Suite | Cases | | Suite | Cases |
 |---|---|---|---|---|
@@ -116,7 +127,7 @@ machine that happened to have the file.
   assertions, asserted by both languages
 - Architecture, data-model, character, voice, intelligence and cost docs
 
-### M1 — Store · written, not yet compiled
+### M1 — Store · written and compiled, `swift test` passes
 
 - GRDB schema matching the reference pipeline
 - `SQLiteHealthStore` implementing `HealthStore`
@@ -124,10 +135,11 @@ machine that happened to have the file.
 - Idempotent ingest by index probe; rollup rebuild scoped to affected days
 - **Acceptance:** `Tests/AURAIngestTests/ConformanceTests.swift` reads the same
   `expected.json` that `tools/conformance.py` asserts, so the two
-  implementations cannot drift apart silently.
-- **Remaining:** `swift build`, then run the suite on the Mac.
+  implementations cannot drift apart silently. Passing on both sides.
+- **Remaining:** a run against the real 293 MB export was not part of this
+  build pass — see M2.
 
-### M2 — Import · written, not yet compiled
+### M2 — Import · written and compiled, `swift test` passes
 
 - `AppleHealthImporter` via streaming `XMLParser`
 - `ImportSession` — parse, store, rebuild, with real counts throughout
@@ -137,12 +149,12 @@ machine that happened to have the file.
   unzipped folder or `export.xml`. Reports counts rather than a spinner, and
   says plainly that a second import being ~99% duplicates is the pipeline
   working rather than a fault
-- **Remaining:** `swift build`, and a run against the real 293 MB export to
-  confirm the parse holds up at scale. Two things that can only be measured
-  there: whether memory stays flat now that batches are written inside the
-  parse, and whether the progress estimate — line number times a measured
-  average line length, since `XMLParser` exposes no byte offset — tracks
-  closely enough to be worth showing.
+- **Remaining:** a run against the real 293 MB export to confirm the parse
+  holds up at scale. Two things that can only be measured there: whether
+  memory stays flat now that batches are written inside the parse, and
+  whether the progress estimate — line number times a measured average line
+  length, since `XMLParser` exposes no byte offset — tracks closely enough to
+  be worth showing.
 
 ### M3 — Dashboard · analytics done, views remaining
 
@@ -160,19 +172,21 @@ machine that happened to have the file.
 - **Done when** the dashboard in the mockups is on screen with real numbers from
   four years of data, and nothing displayed is invented.
 
-### M4 — She appears · renderer written
+### M4 — She appears · renderer written and compiled, currently the active one
 
 - ~~`ProceduralRenderer`: breathing, sway, blink, parallax, amplitude-driven
   mouth, mood as light and posture~~ **written**
 - ~~`MoodResolver` wired to the day's real figures~~ **written**
-- ~~The artwork~~ **superseded** — a full Live2D rig landed instead, so the
-  procedural renderer is the fallback rather than the plan. It still draws when
-  no rig is installed or no Cubism SDK is linked, and says which
+- ~~The artwork~~ **the plan again, for now** — the Live2D rig landed and was
+  meant to replace this, but its mouth mesh doesn't deform (see M9), so
+  `manifest.json` points back at `.procedural` and this is what actually
+  ships. It draws whenever the manifest says `.procedural`, no SDK is linked,
+  or a rig is missing a required parameter, and says which case it's in.
 - Entrance and idle-settle transitions
 - **Done when** she is on screen, reacting to your cursor and to your data, and
   still looks alive after you've watched her for two minutes.
 
-### M5 — She thinks · written, not yet compiled
+### M5 — She thinks · written and compiled, `swift test` passes
 
 - ~~MLX model loading, streaming completion~~ **written** against the current
   `mlx-swift-lm` API (the loading API moved out of `mlx-swift-examples`)
@@ -186,26 +200,29 @@ machine that happened to have the file.
 - ~~Citation chips~~ **written** — `OutputGuard` reports attributions, not just
   rejections, ranked so an ambiguous small number corroborates rather than
   mis-cites
-- **Remaining:** `swift build`, then a first real generation to measure actual
-  first-token latency against the ~0.5 s the voice budget assumes. That number
-  is the one assumption in this milestone that cannot be checked from here.
+- **Remaining:** a first real generation to measure actual first-token latency
+  against the ~0.5 s the voice budget assumes. That number is the one
+  assumption in this milestone that cannot be checked from a build/test run
+  alone.
 - **Done when** she answers "how has my sleep been this year?" correctly, and
   every figure she states can be traced to a computed value.
 
-### M6 — She speaks and listens · written, not yet compiled
+### M6 — She speaks and listens · written and compiled, `swift test` passes
 
 - ~~`SystemVoice` with the amplitude stream driving her mouth~~ **written**,
   rendering to buffers and tapping the playing node so levels are emitted in
-  step with what is audible rather than as the synthesiser renders ahead
+  step with what is audible rather than as the synthesiser renders ahead.
+  `AudioPlayback`'s `scheduleBuffer` call needed a fix for a new SDK async
+  overload during the build pass — see the roadmap's opening section.
 - ~~WhisperKit push-to-talk~~ **written** — hold to talk, release to send, with
   microphone resampling and a silence floor
 - ~~Interruption handling~~ **written** — pressing the talk key cancels
   generation and cuts audio together
-- **Remaining:** `swift build`, the microphone entitlement and usage string
+- **Remaining:** the microphone entitlement and usage string
   (`App/README.md`), and a real conversation to find out whether the end-to-end
   latency is what the budget assumes.
 
-### M7 — She remembers · written, not yet compiled
+### M7 — She remembers · written and compiled, `swift test` passes
 
 - ~~`memory.sqlite`: summarised conversation history, explicit noted facts~~
   **written** — its own database, because memory is the one thing here that a
@@ -215,10 +232,10 @@ machine that happened to have the file.
 - ~~Scheduled morning brief~~ **written** — with an explicit bar for what is
   worth interrupting a morning for, and a silent path that is the common one
 - ~~A screen for reviewing and deleting everything she remembers~~ **written**
-- **Remaining:** `swift build`, and living with it long enough to find out
-  whether the fact proposals are useful or just noise.
+- **Remaining:** living with it long enough to find out whether the fact
+  proposals are useful or just noise.
 
-### M8 — Polish · written, not yet compiled
+### M8 — Polish · written and compiled, `swift test` passes
 
 - ~~`NeuralVoice`~~ **written, and currently not linked** — Kokoro-82M on the
   Neural Engine, so it barely contends with the language model holding the GPU.
@@ -236,11 +253,30 @@ machine that happened to have the file.
 - ~~Golden snapshots against the real export~~ **written** and verified to
   catch a real regression; not committed, since it holds real figures
 
-### M9 — Live2D · rig landed, bridge written, nothing compiled
+### M9 — Live2D · rig landed, mouth mesh unauthored, paused on a re-model
 
 The rig arrived on 17 September 2026 and lives in `Resources/Characters/aura/`.
 Accepted on evidence rather than on the supplier's word — see
 `docs/CHARACTER_DELIVERY_REPORT.md`.
+
+**The mouth check failed, and it's worse than the risk it was written to
+catch.** `ParamMouthOpenY` was scrubbed 0.00 → 1.00 in Cubism Editor and the
+mouth mesh is visually indistinguishable at both ends — not a snap between two
+shapes, effectively no shape change at all. `ParamMouthForm` shows the same
+non-response; `ParamEyeLOpen` works correctly in the same file, which rules
+out a general rendering problem and localizes this to the mouth mesh's
+keyforms specifically. Full finding in `docs/CHARACTER_DELIVERY_REPORT.md`.
+
+This needs a re-sculpted mouth mesh, which is art-authoring work, not
+something fixable in code. **Decision: defer it.** A new character model is
+planned from a different source; the Live2D track is paused rather than
+patched, and `Resources/Characters/aura/runtime/manifest.json`'s `renderer`
+was switched from `"live2d"` back to `"procedural"` so the app ships today
+using the renderer that actually animates a mouth — `CharacterStageView` was
+always built to fall back this way for a missing SDK, and a rig with an
+unauthored mouth is the same situation from the app's point of view. The rig
+files and the Live2D-specific code all stay in place; switching back is a
+one-line manifest change once a working rig lands.
 
 - ~~`MouthShaper`~~ **written and measured** — raw amplitude flutters, and the
   obvious fix (fast attack, slow release) leaves her mouth hanging open through
@@ -264,24 +300,26 @@ Accepted on evidence rather than on the supplier's word — see
   declared counts match, every parameter the physics names exists in the
   compiled `.moc3`, and no parameter is driven by two settings
 
-**Remaining, in the order worth doing them:**
+**Paused. Not resumed by doing more work on this rig — resumed when a new
+model exists.** What was left, for when that happens:
 
-1. **Drag `ParamMouthOpenY` slowly in Cubism Viewer.** Five minutes, and the
-   highest-risk unknown left. Her mouth is driven by a live amplitude stream
-   and uses every intermediate value; a rig built for expression presets snaps
-   between two shapes, which looks fine in any demo video and is wrong here.
-   Worth knowing before the bridge exists rather than after.
-2. **Download Cubism SDK for Native 5.3 or newer** to `Vendor/CubismSDK/`, then
-   `tools/setup_cubism.sh`. The floor is not optional: the rig is moc3 version
-   6 and an older Core refuses it with a message that never mentions SDK
-   versions.
-3. **`swift build`**, then work the errors. The bridge is the least verified
-   code in the project — its call shapes were read from Live2D's published
-   headers rather than recalled, but reading a header is not compiling against
-   one. `docs/CHARACTER_DELIVERY_REPORT.md` lists the likely failures.
-4. **Tune the physics** against what you can finally see.
+1. ~~Drag `ParamMouthOpenY` slowly in Cubism Viewer~~ **done, failed** — see
+   above and `docs/CHARACTER_DELIVERY_REPORT.md`.
+2. **Get a mouth mesh that actually deforms**, from whoever builds the next
+   model. Not a rig re-tune — the open-mouth keyform needs sculpting from
+   scratch.
+3. **Download Cubism SDK for Native 5.3 or newer** to `Vendor/CubismSDK/`, then
+   `tools/setup_cubism.sh`, if not already done. The floor is not optional:
+   moc3 version 6 needs it, and an older Core refuses it with a message that
+   never mentions SDK versions.
+4. **Confirm `CubismBridge` compiles** once the SDK is in place — it was never
+   confirmed as part of the clean `swift build`/`swift test` run, since that
+   depends on whether `Vendor/CubismSDK/` is populated locally.
+5. **Tune the physics** against what you can finally see, once the bridge
+   renders.
 
-- **Done when** the swap is a manifest change and no dashboard code moved.
+- **Done when** the manifest goes back to `"live2d"` and no dashboard code
+  moved.
 
 ### Later — iOS companion
 
@@ -303,21 +341,23 @@ The original estimates, kept for comparison rather than deleted:
 | Live2D | whenever the rig lands — commission it now |
 
 They are not comparable to what happened, and pretending otherwise would be the
-kind of flattering arithmetic this project avoids elsewhere. Everything through
-M9 is *written* and the rig has landed, but nothing has compiled, so none of
-those rows can be called reached. The honest position: the writing is done and
-the verifying has not started.
+kind of flattering arithmetic this project avoids elsewhere. `swift build` and
+`swift test` are now clean, so the software rows can genuinely be called
+reached; the Live2D row cannot — the rig landed but needs a re-sculpted mouth
+before it is a shipped feature rather than a paused one.
 
 ## What is left
 
-1. **`swift build` on the Mac.** Everything else is downstream of it.
-2. **The Cubism Viewer mouth check** — five minutes, and the only item on this
-   list that cannot be done by anyone but a person looking at a screen.
-3. **Measure the two numbers that cannot be known from here:** first-token
-   latency against the ~0.5 s the voice budget assumes, and whether the import
-   holds flat memory across the real 293 MB export.
-4. **Live with it** long enough to find out whether the fact proposals are
+1. ~~`swift build` on the Mac~~ **done — clean, all targets, `swift test`
+   passing.**
+2. ~~The Cubism Viewer mouth check~~ **done — failed.** The character ships as
+   the procedural renderer until a new model exists; see M9.
+3. **Add a macOS CI job** running `swift build`/`swift test` — one job, and
+   from then on it is the gate the Python-only workflow cannot be. The clean
+   run so far is a local, point-in-time result, not yet a standing guarantee.
+4. **Measure the two numbers that cannot be known from a build/test run
+   alone:** first-token latency against the ~0.5 s the voice budget assumes,
+   and whether the import holds flat memory across the real 293 MB export.
+5. **Live with it** long enough to find out whether the fact proposals are
    useful or noise, and whether the composite score's centred-on-50 behaviour
    (`docs/DECISIONS_PENDING.md` §1) is tolerable in practice.
-5. **Add a macOS CI job** once `swift build` passes — one job, and from then on
-   it is the gate the Python workflow cannot be.
